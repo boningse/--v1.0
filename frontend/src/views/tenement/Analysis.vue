@@ -5,7 +5,6 @@
       <div class="toolbar">
         <!-- 换算按钮组 -->
         <div class="convert-group">
-          <span class="label">同比换算</span>
           <el-button-group>
             <el-button
               v-for="btn in convertBtns"
@@ -79,8 +78,39 @@
           </el-card>      </el-col>
       <el-col :span="19">
         <el-card shadow="hover">
-          <template #header><div style="font-size:14px;font-weight:600">能耗数据</div></template>
+          <template #header><div style="font-size:14px;font-weight:600">能耗数据 <span v-if="conversionInfo" style="font-size:12px;font-weight:normal;color:#999;margin-left:8px">单位: {{ conversionInfo.unit }}</span></div></template>
           <div ref="chartRef" style="width:100%;height:420px"></div>
+        </el-card>
+
+        <el-card v-if="summaryData" shadow="hover" style="margin-top:12px">
+          <template #header><div style="font-size:14px;font-weight:600">数据概览</div></template>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">能耗合计</span>
+              <span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">单位面积能耗</span>
+              <span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">参考价值</span>
+              <span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span>
+              <span class="summary-unit">元</span>
+            </div>
+            <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
+              <span class="summary-label">
+                能耗趋势
+                <span v-if="summaryData.trend < 0" class="trend-arrow">↓</span>
+                <span v-else-if="summaryData.trend > 0" class="trend-arrow">↑</span>
+                <span v-else class="trend-arrow">→</span>
+              </span>
+              <span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span>
+              <span class="summary-unit">较上期</span>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -88,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { Clock, Calendar, Search } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/index'
 import { ElMessage } from 'element-plus'
@@ -104,11 +134,14 @@ let chartInstance: echarts.ECharts | null = null
 const energyType = ref(1)
 
 const convertBtns = [
+  { type: 3, label: '分户能耗' },
   { type: 1, label: '标准煤' },
   { type: 2, label: '碳排量' },
-  { type: 3, label: '原始数据' }
+  { type: 4, label: '单位面积能耗' },
 ]
 const conversionType = ref(3)
+const conversionInfo = ref<any>(null)
+const summaryData = ref<any>(null)
 const timeType = ref('day')
 const dateSingle = ref(new Date().toISOString().slice(0, 10))
 const dateMonth = ref(new Date().toISOString().slice(0, 7))
@@ -119,10 +152,23 @@ function switchConversion(t: number) { conversionType.value = t; doSearch() }
 function onTimeTypeChange() { doSearch() }
 
 async function loadTree() {
+  summaryData.value = null
+  conversionInfo.value = null
+  chartInstance?.dispose()
+  chartInstance = null
   loading.value = true
   try {
     const r = await getTenementList(app.buildingSign, energyType.value)
-    if (r.success) treeData.value = r['总用电'] || r.data || []
+    if (r.success) {
+      treeData.value = r.tree || r.data || []
+      nextTick(() => {
+        const first = treeData.value?.[0]
+        if (first) {
+          treeRef.value?.setCurrentKey(first.id)
+          doSearch()
+        }
+      })
+    }
   } catch { ElMessage.error('加载分户列表失败') }
   finally { loading.value = false }
 }
@@ -130,15 +176,22 @@ async function loadTree() {
 async function doSearch() {
   const selectedIds = treeRef.value?.getCurrentKey()
   if (!selectedIds) { ElMessage.warning('请选择分户'); return }
-  const p: any = { sign: app.buildingSign, tenement_ids: [selectedIds], conversion_type: conversionType.value, xdate: timeType.value }
+  const p: any = { sign: app.buildingSign, item_ids: String(selectedIds), conversion_type: conversionType.value, xdate: timeType.value, energy_type: energyType.value }
   if (timeType.value === 'day') { p.start_date = p.end_date = dateSingle.value }
-  else if (timeType.value === 'month') { p.start_date = dateMonth.value + '-01'; p.end_date = dateMonth.value + '-31' }
+  else if (timeType.value === 'month') { const [y, m] = dateMonth.value.split('-').map(Number); p.start_date = dateMonth.value + '-01'; p.end_date = dateMonth.value + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0') }
   else if (timeType.value === 'year') { p.start_date = dateYear.value + '-01-01'; p.end_date = dateYear.value + '-12-31' }
   else if (timeType.value === 'range' && dateRange.value) { p.start_date = dateRange.value[0]; p.end_date = dateRange.value[1] }
   loading.value = true
   try {
     const r = await getTenementAnalysis(p)
-    if (r.success && r.data) renderChart(r.data)
+    if (r.success && r.data) {
+      conversionInfo.value = r.conversion || null
+      summaryData.value = r.summary || null
+      renderChart({
+        categories: r.times || [],
+        series: (r.data || []).map((t: any) => ({ name: t.name, data: t.data }))
+      })
+    }
   } catch { ElMessage.error('查询失败') }
   finally { loading.value = false }
 }
@@ -165,7 +218,7 @@ watch(() => app.buildingSign, () => { loadTree() })
 watch(energyType, () => { loadTree() })
 </script>
 <style scoped>
-.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; } .toolbar .filter-group { margin-left: auto; }
 .convert-group { display: flex; align-items: center; gap: 4px; }
 .filter-group { display: flex; align-items: center; gap: 6px; }
 .label { font-size: 13px; color: #666; white-space: nowrap; }
@@ -173,4 +226,14 @@ watch(energyType, () => { loadTree() })
 .tree-card { height: calc(100vh - 220px); overflow-y: auto; }
 .tree-header { display: flex; align-items: center; justify-content: space-between; }
 .tree-actions { display: flex; gap: 4px; }
+.summary-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+.summary-item { display: flex; align-items: baseline; gap: 6px; padding: 8px 16px; background: #fafafa; border-radius: 6px; min-width: 140px; }
+.summary-label { font-size: 13px; color: #666; }
+.summary-value { font-size: 18px; font-weight: 700; color: #1890ff; }
+.summary-unit { font-size: 12px; color: #999; }
+.summary-item.trend-down { background: #fff1f0; }
+.summary-item.trend-down .summary-value { color: #f5222d; }
+.summary-item.trend-up { background: #f6ffed; }
+.summary-item.trend-up .summary-value { color: #52c41a; }
+.trend-arrow { font-size: 14px; margin-left: 2px; }
 </style>

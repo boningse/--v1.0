@@ -5,8 +5,8 @@ API: nengyuan_sub_fenhu_nenghao.ashx M=0/M=1
 from fastapi import APIRouter, Depends, Query
 from routers.auth import current_user
 from database import db
-from datetime import date
-from utils.helpers import tenement_table, get_year_months, parse_date, safe_float
+from datetime import date, timedelta
+from utils.helpers import tenement_table, get_year_months, parse_date, safe_float, apply_conversion, get_conversion_info
 
 router = APIRouter()
 
@@ -55,7 +55,7 @@ async def tenement_list(sign: str = Query(...), energy_type: int = Query(1), use
 async def tenement_analysis(
     sign: str = Query(...), item_ids: str = Query(""),
     start_date: str = Query(...), end_date: str = Query(...),
-    xdate: str = Query("day"), energy_type: int = Query(1), user: dict = Depends(current_user),
+    xdate: str = Query("day"), conversion_type: int = Query(3), energy_type: int = Query(1), user: dict = Depends(current_user),
 ):
     """分户分析数据 - 对应 M=1 (时序图)"""
     sd = parse_date(start_date); ed = parse_date(end_date)
@@ -185,14 +185,86 @@ async def tenement_analysis(
         times = times[:24]
         time_data = {ts: time_data[ts] for ts in times}
 
+    # === 建筑面积 & 参考数据 ===
+    _area = 0.0
+    _price = 0.8
+    try:
+        area_row = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='Area'", (sign,))
+        if area_row and area_row["value"]:
+            _area = float(area_row["value"])
+        price_row = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='BuildingJiageMoban'", (sign,))
+        if price_row and price_row["value"]:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(price_row["value"])
+            p = root.find('.//Price')
+            if p is not None and p.text:
+                _price = float(p.text)
+    except:
+        pass
+
     # Build per-tenement response
     result = []
     for t in tenements:
-        item_data = [round(time_data[ts].get(t["sign"], 0), 2) for ts in times]
-        total = round(sum(item_data), 2)
+        item_data = [round(apply_conversion(time_data[ts].get(t["sign"], 0), conversion_type, _area), 3) for ts in times]
+        total = round(sum(item_data), 3)
         result.append({"id": t["id"], "name": t["name"], "sign": t["sign"], "total": total, "data": item_data})
 
     # Sort by total descending
     result.sort(key=lambda x: x["total"], reverse=True)
 
-    return {"success": True, "data": result, "times": times}
+    # === 数据概览 ===
+    total_energy = round(sum(t["total"] for t in result), 3)
+    per_area_energy = total_energy if conversion_type == 4 else (round(total_energy / _area, 3) if _area > 0 else 0)
+    reference_value = round(total_energy * _price, 2)
+
+    # 能耗趋势（环比）
+    prev_total = 0.0
+    trend = 0.0
+    try:
+        sd = parse_date(start_date)
+        ed = parse_date(end_date)
+        if xdate == "day":
+            prev_sd = sd - timedelta(days=1)
+            prev_ed = ed - timedelta(days=1)
+        elif xdate == "month":
+            import calendar as _cal
+            if sd.month == 1:
+                prev_sd = sd.replace(year=sd.year-1, month=12, day=1)
+            else:
+                prev_sd = sd.replace(month=sd.month-1, day=1)
+            _, last_day = _cal.monthrange(prev_sd.year, prev_sd.month)
+            prev_ed = prev_sd.replace(day=last_day)
+        elif xdate == "year":
+            prev_sd = sd.replace(year=sd.year-1)
+            prev_ed = ed.replace(year=ed.year-1)
+        else:
+            period_days = (ed - sd).days + 1
+            prev_sd = sd - timedelta(days=period_days)
+            prev_ed = sd - timedelta(days=1)
+        if prev_sd and prev_ed:
+            prev_yms = get_year_months(prev_sd, prev_ed)
+            prev_sum = 0.0
+            for ym in prev_yms:
+                try:
+                    rows = db.query("constr_tenementdata",
+                        f"SELECT data FROM {tenement_table(ym, sign, energy_type, gran)} WHERE timefrom BETWEEN %s AND %s",
+                        (prev_sd.strftime('%Y-%m-%d'), prev_ed.strftime('%Y-%m-%d') + ' 23:59:59'))
+                    for r in rows:
+                        prev_sum += apply_conversion(safe_float(r["data"]), conversion_type)
+                except:
+                    pass
+            prev_total = round(prev_sum, 2)
+            if prev_total > 0:
+                trend = round((total_energy - prev_total) / prev_total * 100, 1)
+    except Exception as _trend_err:
+        import logging
+        logging.getLogger(__name__).warning("Trend error: %s", str(_trend_err)[:200])
+
+    summary = {
+        "total_energy": total_energy,
+        "per_area_energy": per_area_energy,
+        "reference_value": reference_value,
+        "trend": trend,
+    }
+
+    return {"success": True, "data": result, "times": times, "conversion": get_conversion_info(conversion_type), "summary": summary}
