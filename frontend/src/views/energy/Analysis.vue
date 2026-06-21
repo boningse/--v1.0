@@ -83,7 +83,7 @@
         <el-card shadow="hover" class="tree-card">
           <template #header>
             <div class="tree-header">
-              <span>用电类型</span>
+              <span>分项类型</span>
             </div>
           </template>
           <el-tree
@@ -91,11 +91,9 @@
             :data="treeData"
             :props="{ children: 'children', label: 'name', disabled: 'disabled' }"
             node-key="id"
-            show-checkbox
-            check-strictly
             default-expand-all
             highlight-current
-            @check="doSearch"
+            @node-click="onNodeClick"
           />
         </el-card>
       </el-col>
@@ -115,22 +113,33 @@
         <!-- 汇总卡片 -->
         <el-card v-if="summaryData" shadow="hover" style="margin-top: 12px">
           <template #header>
-            <div style="font-size: 14px; font-weight: 600">汇总</div>
+            <div style="font-size: 14px; font-weight: 600">数据概览</div>
           </template>
           <div class="summary-grid">
             <div class="summary-item">
-              <span class="summary-label">总能耗合计</span>
+              <span class="summary-label">能耗合计</span>
               <span class="summary-value">{{ summaryData.total_energy }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}</span>
             </div>
-            <div
-              v-for="(total, id) in summaryData.item_totals"
-              :key="id"
-              class="summary-item"
-            >
-              <span class="summary-label">{{ itemNameMap[Number(id)] || '分项' + id }}</span>
-              <span class="summary-value">{{ total }}</span>
-              <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+            <div class="summary-item">
+              <span class="summary-label">单位面积能耗</span>
+              <span class="summary-value">{{ summaryData.per_area_energy }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">参考价值</span>
+              <span class="summary-value">{{ summaryData.reference_value }}</span>
+              <span class="summary-unit">元</span>
+            </div>
+            <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
+              <span class="summary-label">
+                能耗趋势
+                <span v-if="summaryData.trend < 0" class="trend-arrow">↓</span>
+                <span v-else-if="summaryData.trend > 0" class="trend-arrow">↑</span>
+                <span v-else class="trend-arrow">→</span>
+              </span>
+              <span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span>
+              <span class="summary-unit">较上期</span>
             </div>
           </div>
         </el-card>
@@ -152,12 +161,14 @@ const loading = ref(false)
 const treeData = ref<any[]>([])
 const treeRef = ref<any>(null)
 const chartRef = ref<HTMLElement | null>(null)
+const selectedItemId = ref<number | null>(null)
 let chartInstance: echarts.ECharts | null = null
 
 const convertBtns = [
+  { type: 3, label: '分项能耗' },
   { type: 1, label: '标准煤' },
   { type: 2, label: '碳排量' },
-  { type: 3, label: '原始数据' },
+  { type: 4, label: '单位面积能耗' },
 ]
 const conversionType = ref(3)
 const conversionInfo = ref<any>(null)
@@ -184,12 +195,26 @@ function onTimeTypeChange() {
   doSearch()
 }
 
+function onNodeClick(data: any) {
+  if (data.disabled) return
+  selectedItemId.value = data.id
+  treeRef.value?.setCurrentKey(data.id)
+  doSearch()
+}
+
 async function loadTree() {
   loading.value = true
   try {
     const r = await getEnergyItems(app.buildingSign)
     if (r.success) {
-      treeData.value = r['总用电'] || []
+      // 添加顶级根节点"分项能耗"，包装四大分项
+      const children = r['总用电'] || []
+      treeData.value = [{ id: 1, name: '分项能耗', disabled: false, children }]
+      nextTick(() => {
+        selectedItemId.value = 1
+        treeRef.value?.setCurrentKey(1)
+        doSearch()
+      })
     }
   } catch {
     ElMessage.error('加载用电类型失败')
@@ -199,15 +224,14 @@ async function loadTree() {
 }
 
 async function doSearch() {
-  const checked = treeRef.value?.getCheckedKeys() || []
-  if (!checked.length) {
-    ElMessage.warning('请选择用电类型')
+  if (!selectedItemId.value) {
+    ElMessage.warning('请选择分项类型')
     return
   }
 
   const params: any = {
     sign: app.buildingSign,
-    item_ids: checked.join(','),
+    item_ids: String(selectedItemId.value),
     conversion_type: conversionType.value,
     xdate: timeType.value,
   }
@@ -240,12 +264,15 @@ async function doSearch() {
       // 构建分项名称映射
       if (r.items) {
         const map: Record<number, string> = {}
-        r.items.forEach((i: any) => { map[i.id] = i.name })
+        r.items.forEach((i: any) => {
+          map[i.id] = i.name === '总用电合计' ? '分项能耗' : i.name
+        })
         itemNameMap.value = map
       }
 
       await nextTick()
-      renderChart(r.times || [], r.series || [])
+      const filteredSeries = (r.series || []).filter((s: any) => s.name !== '合计')
+      renderChart(r.times || [], filteredSeries)
     }
   } catch {
     ElMessage.error('查询失败')
@@ -326,6 +353,7 @@ onUnmounted(() => {
 })
 
 watch(() => app.buildingSign, () => {
+  selectedItemId.value = null
   loadTree()
 })
 </script>
@@ -336,6 +364,9 @@ watch(() => app.buildingSign, () => {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+.toolbar .filter-group {
+  margin-left: auto;
 }
 .convert-group {
   display: flex;
@@ -363,6 +394,17 @@ watch(() => app.buildingSign, () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+/* 无数据的分项显示为灰色，不可选中 */
+.el-tree-node.is-disabled > .el-tree-node__content {
+  color: #bbb;
+  cursor: not-allowed;
+}
+.el-tree-node.is-disabled > .el-tree-node__content .el-tree-node__label {
+  color: #bbb;
+}
+.el-tree-node.is-disabled .el-checkbox {
+  display: none;
 }
 .chart-header {
   display: flex;
@@ -402,5 +444,21 @@ watch(() => app.buildingSign, () => {
 .summary-unit {
   font-size: 12px;
   color: #999;
+}
+.summary-item.trend-down {
+  background: #fff1f0;
+}
+.summary-item.trend-down .summary-value {
+  color: #f5222d;
+}
+.summary-item.trend-up {
+  background: #f6ffed;
+}
+.summary-item.trend-up .summary-value {
+  color: #52c41a;
+}
+.trend-arrow {
+  font-size: 14px;
+  margin-left: 2px;
 }
 </style>

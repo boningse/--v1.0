@@ -141,12 +141,18 @@ def _fallback_energydata(sign, today_val, today_ym, building, building_area, tp,
             continue
     energy_by_area = round(total_energy / building_area, 6) if building_area > 0 else 0
     total_price = round(total_energy * 0.8, 2)
-    status = "正常" if current_time else "异常"
-    if current_time:
-        try:
-            dt = datetime.strptime(current_time, "%Y-%m-%d %H:%M")
-            if (datetime.now() - dt).total_seconds() > 1800: status = "异常"
-        except: status = "异常"
+    status = "异常"
+    try:
+        ym = date.today().strftime("%Y%m")
+        tbl = f"bnse_originaldata.`{ym}_recorddata_{sign}`"
+        thirty_min_ago = (datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+        row = db.query_one("constr_ems",
+            f"SELECT COUNT(*) as cnt FROM {tbl} WHERE receivetime >= %s",
+            (thirty_min_ago,))
+        if row and row["cnt"] > 0:
+            status = "正常"
+    except:
+        pass
     return {"success": True, "data": {
         "building": {"name": building["name"], "sign": building["sign"], "introduction": building.get("introduction") or "", "type": building.get("type") or "", "area": building_area, "people": building.get("people", 0)},
         "stats": {"energy_total": round(total_energy, 2), "energy_by_area": energy_by_area, "total_price": total_price, "power_max": round(max_power, 4), "current_time": current_time, "date": current_time[:10] if current_time else "", "time": current_time[11:] if len(current_time) > 11 else "", "status": status, "unit": tp["unit"], "unit_area": tp["unit_area"]},
@@ -186,10 +192,10 @@ def compute_node_energy(node_id, svc_info, tree, svc_to_meter, meter_data, ts, r
     if real_meters is None:
         real_meters = set()
     meter_sign = svc_to_meter.get(node_id)
-    # 有实表且 servicedata 有数据 → 直接使用
-    if meter_sign and meter_sign in real_meters and meter_sign in meter_data:
-        return meter_data[meter_sign].get(ts, 0.0)
-    # 否则由下级子节点汇总
+    # 实表 → 直接取 servicedata 数据（即使为0也不汇总子节点）
+    if meter_sign and meter_sign in real_meters:
+        return meter_data.get(meter_sign, {}).get(ts, 0.0)
+    # 虚表 → 由下级子节点汇总
     children = tree.get(node_id, [])
     if not children:
         return 0.0
@@ -261,7 +267,7 @@ async def homepage(
                 real_meters.add(str(r["sign"]))
         except:
             pass
-        meter_data = load_service_meter_data(sign, today_val, today_ym, gran=1)  # 今日=1天>1小时，用小时表
+        meter_data = load_service_meter_data(sign, today_val, today_ym, gran=0)  # 首页只用 t0 表
         for md in meter_data.values():
             all_times.update(md.keys())
         sorted_times = sorted(all_times)
@@ -308,35 +314,41 @@ async def homepage(
     price_rate = {1: 0.8, 2: 10, 3: 10, 11: 4.5, 13: 3.5, 6: 5}
     total_price = round(total_energy * price_rate.get(energy_type, 0.8), 2)
 
-    status = "正常"
-    if not current_time:
-        status = "异常"
-    else:
-        try:
-            dt = datetime.strptime(current_time, "%Y-%m-%d %H:%M")
-            if (datetime.now() - dt).total_seconds() > 1800: status = "异常"
-        except: status = "异常"
-
-    # 获取分项占比数据（来自 energydata）
-    cat_data = {}
+    status = "异常"
     try:
-        cat_map = {11: "照明", 12: "动力", 13: "空调", 14: "其他"}
-        for eid, ename in cat_map.items():
-            total = 0.0
-            for g in [0, 1, 2]:
-                try:
-                    etbl = energy_table(today_ym, sign, 1, g)
-                    row = db.query_one("constr_energydata",
-                        f"SELECT SUM(data) as t FROM " + "`" + etbl + "`" + " WHERE energyid=%s AND timefrom BETWEEN %s AND %s",
-                        (eid, today_val, today_val + " 23:59:59"))
-                    if row and row.get("t") and float(row["t"]) > 0:
-                        total = safe_float(row["t"])
-                        break
-                except: pass
-            if total > 0:
-                cat_data[ename] = round(total, 2)
-    except: pass
+        ym = date.today().strftime("%Y%m")
+        tbl = f"bnse_originaldata.`{ym}_recorddata_{sign}`"
+        thirty_min_ago = (datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+        row = db.query_one("constr_ems",
+            f"SELECT COUNT(*) as cnt FROM {tbl} WHERE receivetime >= %s",
+            (thirty_min_ago,))
+        if row and row["cnt"] > 0:
+            status = "正常"
+    except:
+        pass
 
+        # 获取分项占比数据（仅限电类型有分项概念）
+    cat_data = {}
+    if energy_type == 1:
+        try:
+            cat_map = {11: "照明", 12: "动力", 13: "空调", 14: "其他"}
+            for eid, ename in cat_map.items():
+                total = 0.0
+                for g in [0, 1, 2]:
+                    try:
+                        etbl = energy_table(today_ym, sign, 1, g)
+                        row = db.query_one("constr_energydata",
+                            f"SELECT SUM(data) as t FROM " + "`" + etbl + "`" + " WHERE energyid=%s AND timefrom BETWEEN %s AND %s",
+                            (eid, today_val, today_val + " 23:59:59"))
+                        if row and row.get("t") and float(row["t"]) > 0:
+                            total = safe_float(row["t"])
+                            break
+                    except:
+                        pass
+                if total > 0:
+                    cat_data[ename] = round(total, 2)
+        except:
+            pass
     return {
         "success": True,
         "data": {

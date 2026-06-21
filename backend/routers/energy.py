@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from routers.auth import current_user
 from database import db
 from utils.helpers import energy_table, get_year_months, parse_date, safe_float, resolve_granularity, apply_conversion, get_conversion_info
+from datetime import date, timedelta
 
 router = APIRouter()
 
@@ -37,7 +38,6 @@ async def get_energy_items(sign: str = Query(...), user: dict = Depends(current_
             total_children.append(node)
     result["总用电"] = total_children
 
-    from datetime import date
     ym = date.today().strftime("%Y%m")
     data_ids = set()
     for gran in [0, 1, 2]:
@@ -72,7 +72,13 @@ async def energy_analysis(
     sd = parse_date(start_date); ed = parse_date(end_date)
     if not sd or not ed: return {"success": False, "message": "日期格式错误"}
     yms = get_year_months(sd, ed)
-    conv_info = get_conversion_info(conversion_type)
+    # 查询建筑面积（用于单位面积能耗换算）
+    _area = 0.0
+    try:
+        ar = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='Area'", (sign,))
+        if ar and ar["value"]: _area = float(ar["value"])
+    except: pass
+    conv_info = get_conversion_info(conversion_type, _area)
 
     raw_ids = [x.strip() for x in item_ids.split(",") if x.strip()] if item_ids else []
     has_total = "total" in raw_ids
@@ -97,7 +103,7 @@ async def energy_analysis(
                 if ids and eid not in ids: continue
                 ts = str(r["timefrom"])[:16] if gran <= 1 else str(r["timefrom"])[:10]
                 if ts not in time_data: time_data[ts] = {}
-                time_data[ts][eid] = time_data[ts].get(eid, 0) + apply_conversion(safe_float(r["data"]), conversion_type)
+                time_data[ts][eid] = time_data[ts].get(eid, 0) + apply_conversion(safe_float(r["data"]), conversion_type, _area)
         except: pass
 
     if has_total and 1 not in user_ids:
@@ -231,7 +237,84 @@ async def energy_analysis(
     item_totals = {}
     for item in items:
         item_totals[item["id"]] = round(sum(time_data[t].get(item["id"], 0) for t in times), 2)
-    summary = {"total_energy": total_energy, "item_totals": item_totals}
+
+    # === 建筑面积 & 参考数据 ===
+    area = 0.0
+    price = 0.8  # 默认电价 元/度
+    try:
+        area_row = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='Area'", (sign,))
+        if area_row and area_row["value"]:
+            area = float(area_row["value"])
+        # 从价格模板解析电价
+        price_row = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='BuildingJiageMoban'", (sign,))
+        if price_row and price_row["value"]:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(price_row["value"])
+            p = root.find('.//Price')
+            if p is not None and p.text:
+                price = float(p.text)
+    except Exception as _trend_err:
+        import logging
+        logging.getLogger(__name__).warning("Trend error: %s", str(_trend_err)[:200])
+
+    per_area_energy = round(total_energy / area, 2) if area > 0 else 0
+    reference_value = round(total_energy * price, 2)
+
+    # === 能耗趋势（环比）：按视图类型对比前一周期 ===
+    prev_total = 0.0
+    trend = 0.0
+    try:
+        if xdate == "day":
+            # 日视图：对比昨天
+            prev_sd = sd - timedelta(days=1)
+            prev_ed = ed - timedelta(days=1)
+        elif xdate == "month":
+            # 月视图：对比上月同期
+            import calendar as _cal
+            if sd.month == 1:
+                prev_sd = sd.replace(year=sd.year-1, month=12, day=1)
+            else:
+                prev_sd = sd.replace(month=sd.month-1, day=1)
+            _, last_day = _cal.monthrange(prev_sd.year, prev_sd.month)
+            prev_ed = prev_sd.replace(day=last_day)
+        elif xdate == "year":
+            # 年视图：对比上年同期
+            prev_sd = sd.replace(year=sd.year-1)
+            prev_ed = ed.replace(year=ed.year-1)
+        else:
+            # range 视图：对比前一个同样长度的时段
+            period_days = (ed - sd).days + 1
+            prev_sd = sd - timedelta(days=period_days)
+            prev_ed = sd - timedelta(days=1)
+
+        if prev_sd and prev_ed:
+            prev_yms = get_year_months(prev_sd, prev_ed)
+            prev_sum = 0.0
+            for ym in prev_yms:
+                try:
+                    rows = db.query("constr_energydata",
+                        f"SELECT data FROM {energy_table(ym, sign, 1, gran)} WHERE timefrom BETWEEN %s AND %s",
+                        (prev_sd.strftime('%Y-%m-%d'), prev_ed.strftime('%Y-%m-%d') + ' 23:59:59'))
+                    for r in rows:
+                        prev_sum += apply_conversion(safe_float(r["data"]), conversion_type, _area)
+                except:
+                    pass
+            prev_total = round(prev_sum, 2)
+            if prev_total > 0:
+                trend = round((total_energy - prev_total) / prev_total * 100, 1)
+    except Exception as _trend_err:
+        import logging
+        logging.getLogger(__name__).warning("Trend error: %s", str(_trend_err)[:200])
+
+    summary = {
+        "total_energy": total_energy,
+        "item_totals": item_totals,
+        "area": area,
+        "per_area_energy": per_area_energy,
+        "reference_value": reference_value,
+        "trend": trend,
+        "prev_total": prev_total,
+    }
 
     return {"success": True, "times": times, "series": series,
             "items": [{"id": i["id"], "name": i["name"]} for i in items],
@@ -249,7 +332,12 @@ async def energy_ratio(
     if not sd or not ed:
         return {"success": False, "message": "日期格式错误"}
     yms = get_year_months(sd, ed)
-    conv_info = get_conversion_info(conversion_type)
+    _area = 0.0
+    try:
+        ar = db.query_one("constr_ems", "SELECT value FROM v_building WHERE sign=%s AND name='Area'", (sign,))
+        if ar and ar["value"]: _area = float(ar["value"])
+    except: pass
+    conv_info = get_conversion_info(conversion_type, _area)
 
     gran = resolve_granularity(start_date, end_date)
 

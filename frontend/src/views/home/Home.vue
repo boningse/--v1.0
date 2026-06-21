@@ -32,9 +32,9 @@
     </el-row>
 
     <!-- 图表 + 右侧面板 -->
-    <el-row :gutter="16">
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="never" class="chart-card">
+    <el-row :gutter="16" style="display:flex;flex-wrap:wrap;align-items:stretch">
+      <el-col :xs="24" :lg="16" style="display:flex">
+        <el-card shadow="never" class="chart-card" style="flex:1;display:flex;flex-direction:column">
           <template #header>
             <div class="chart-header">
               <span class="chart-title">{{ data?.chart?.title || '今日能耗' }}</span>
@@ -47,13 +47,13 @@
               </div>
             </div>
           </template>
-          <div ref="chartRef" style="height:380px"></div>
+          <div ref="chartRef" style="min-height:418px;flex:1"></div>
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :lg="8">
+      <el-col :xs="24" :lg="8" style="display:flex;flex-direction:column">
         <!-- 概要面板 -->
-        <el-card shadow="never" class="summary-card">
+        <el-card shadow="never" class="summary-card" style="flex:2">
           <template #header><span class="card-title">能耗概要</span></template>
           <div class="summary-items">
             <div class="summary-item" v-for="item in summaryItems" :key="item.label">
@@ -65,7 +65,7 @@
         </el-card>
 
         <!-- 分项占比快速预览 -->
-        <el-card shadow="never" class="cats-card" style="margin-top:12px">
+        <el-card shadow="never" class="cats-card" style="margin-top:12px;flex:1">
           <template #header><span class="card-title">分项占比</span></template>
           <div class="cat-bars">
             <div v-for="cat in catItems" :key="cat.name" class="cat-row">
@@ -127,7 +127,7 @@ const catItems = computed(() => {
   const names = ['照明', '动力', '空调', '其他']
   return names.map((name, i) => {
     const val = raw[name] ? Number(raw[name]) : 0
-    return { name, val: val.toFixed(1), pct: total > 0 ? (val / total * 100) : 0, color: catColors[i] }
+    return { name, val: val.toFixed(1), pct: total > 0 ? Math.max(val / total * 100, 1) : 0, color: catColors[i] }
   }).filter(c => c.pct > 0 || true)
 })
 
@@ -152,7 +152,8 @@ function renderChart() {
   chartInstance = echarts.init(chartRef.value)
   const cd = data.value.chart
 
-  chartInstance.setOption({
+  chartInstance.setOption(
+    {
     tooltip: {
       trigger: 'axis',
       formatter: (params: any) => {
@@ -161,7 +162,7 @@ function renderChart() {
       },
       axisPointer: { type: 'cross' }
     },
-    grid: { top: 20, right: 30, bottom: 35, left: 65 },
+    grid: { top: 20, right: 30, bottom: 50, left: 65 },
     xAxis: {
       type: 'category', boundaryGap: true,
       data: cd.data.map((d: any) => d.time?.slice(11) || d.time),
@@ -172,6 +173,8 @@ function renderChart() {
     yAxis: {
       type: 'value', name: cd.label || 'kWh',
       nameTextStyle: { fontSize: 11, color: '#8c8c8c' },
+      nameLocation: 'middle',
+      nameGap: 35,
       axisLine: { show: false },
       axisTick: { show: false },
       splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }
@@ -257,14 +260,25 @@ onBeforeUnmount(() => {
 .stat-unit { font-size: 12px; font-weight: 400; opacity: .7; }
 
 /* 图表卡片 */
-.chart-card { border-radius: 10px; }
+.chart-card {
+  border-radius: 10px;
+}
+.chart-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+}
 .chart-card :deep(.el-card__header) { border-bottom: 1px solid #f0f0f0; padding: 14px 20px; }
 .chart-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .chart-title { font-size: 15px; font-weight: 600; color: #1a1a2e; }
 .energy-switch :deep(.el-radio-button__inner) { font-size: 11px; padding: 5px 12px; }
 
 /* 摘要卡片 */
-.summary-card { border-radius: 10px; }
+.summary-card {
+  border-radius: 10px;
+}
+.summary-card :deep(.el-card__body) {
+  flex: 1;
+}
 .summary-card :deep(.el-card__header),
 .cats-card :deep(.el-card__header) { border-bottom: 1px solid #f0f0f0; padding: 14px 20px; }
 .card-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
