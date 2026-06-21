@@ -151,7 +151,7 @@ async def energy_analysis(
         # 月视图：聚合为 MM-DD 格式
         day_agg = {}
         for ts in times:
-            day_key = ts[5:10] if len(ts) > 10 else ts
+            day_key = ts[5:10] if len(ts) >= 10 else ts
             if day_key not in day_agg: day_agg[day_key] = {}
             for eid, v in time_data[ts].items():
                 day_agg[day_key][eid] = day_agg[day_key].get(eid, 0) + v

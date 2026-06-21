@@ -5,7 +5,6 @@
       <div class="toolbar">
         <!-- 换算按钮组 -->
         <div class="convert-group">
-          <span class="label">同比换算</span>
           <el-button-group>
             <el-button
               v-for="btn in convertBtns"
@@ -77,7 +76,7 @@
     </el-card>
 
     <!-- ====== 主体: 左侧分项树 + 右侧图表 ====== -->
-    <el-row :gutter="16" style="margin-top: 12px">
+    <el-row :gutter="16" style="margin-top:12px;display:flex;flex-wrap:wrap;align-items:stretch">
       <!-- 左侧: 分项树 -->
       <el-col :span="5">
         <el-card shadow="hover" class="tree-card">
@@ -311,7 +310,7 @@ function renderChart(times: string[], series: any[]) {
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
-      data: times,
+      data: times.map(t => t.length > 8 ? t.slice(5) : t),
       axisLabel: { rotate: times.length > 12 ? 45 : 0, fontSize: 11 },
     },
     yAxis: {

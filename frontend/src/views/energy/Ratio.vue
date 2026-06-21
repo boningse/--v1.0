@@ -29,7 +29,7 @@
             <el-option label="时间段" value="range" />
           </el-select>
 
-          <el-icon class="ml-2" style="color:#1890ff"><Calendar /></el-icon>
+          <el-icon class="ml-2" style="color:#13c785"><Calendar /></el-icon>
 
           <!-- 日: 单日期 -->
           <el-date-picker
@@ -105,6 +105,20 @@
           <template #header><div style="font-size:14px;font-weight:600">能耗数据</div></template>
           <div ref="chartRef" style="width:100%;height:420px"></div>
         </el-card>
+
+        <!-- 汇总卡片 -->
+        <el-card v-if="summaryData" shadow="hover" style="margin-top: 12px">
+          <template #header>
+            <div style="font-size: 14px; font-weight: 600">数据概览</div>
+          </template>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">总能耗</span>
+              <span class="summary-value">{{ summaryData.total_energy }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+            </div>
+          </div>
+        </el-card>
       </el-col>
     </el-row>
   </div>
@@ -126,11 +140,14 @@ const chartRef = ref(null)
 let chartInstance: echarts.ECharts | null = null
 
 const convertBtns = [
+  { type: 3, label: '分项能耗' },
   { type: 1, label: '标准煤' },
   { type: 2, label: '碳排量' },
-  { type: 3, label: '原始数据' }
+  { type: 4, label: '单位面积能耗' },
 ]
 const conversionType = ref(3)
+const summaryData = ref<any>(null)
+const conversionInfo = ref<any>(null)
 const timeType = ref('day')
 const dateSingle = ref(new Date().toISOString().slice(0, 10))
 const dateMonth = ref(new Date().toISOString().slice(0, 7))
@@ -160,7 +177,11 @@ async function doSearch() {
   loading.value = true
   try {
     const r = await getEnergyRatio(p)
-    if (r.success && r.data) renderChart(r.data)
+    if (r.success && r.data) {
+      summaryData.value = { total_energy: r.total || 0 }
+      conversionInfo.value = r.conversion || null
+      renderChart(r.data)
+    }
   } catch { ElMessage.error('查询失败') }
   finally { loading.value = false }
 }
@@ -185,11 +206,56 @@ watch(() => app.buildingSign, () => { loadTree() })
 </script>
 <style scoped>
 .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar .filter-group { margin-left: auto; }
 .convert-group { display: flex; align-items: center; gap: 4px; }
 .filter-group { display: flex; align-items: center; gap: 6px; }
 .label { font-size: 13px; color: #666; white-space: nowrap; }
 .ml-2 { margin-left: 8px; }
-.tree-card { height: calc(100vh - 220px); overflow-y: auto; }
-.tree-header { display: flex; align-items: center; justify-content: space-between; }
+.tree-card { height: calc(100vh - 220px); overflow-y: auto; border-radius: 10px; }
+.tree-header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; color: #1a1a2e; }
 .tree-actions { display: flex; gap: 4px; }
+.summary-grid
+ {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #fafafa;
+  border-radius: 6px;
+  min-width: 140px;
+}
+.summary-label {
+  font-size: 13px;
+  color: #666;
+}
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1890ff;
+}
+.summary-unit {
+  font-size: 12px;
+  color: #999;
+}
+.summary-item.trend-down {
+  background: #fff1f0;
+}
+.summary-item.trend-down .summary-value {
+  color: #f5222d;
+}
+.summary-item.trend-up {
+  background: #f6ffed;
+}
+.summary-item.trend-up .summary-value {
+  color: #52c41a;
+}
+.trend-arrow {
+  font-size: 14px;
+  margin-left: 2px;
+}
 </style>

@@ -37,7 +37,7 @@
             <el-option label="时间段" value="range" />
           </el-select>
 
-          <el-icon class="ml-2" style="color:#1890ff"><Calendar /></el-icon>
+          <el-icon class="ml-2" style="color:#13c785"><Calendar /></el-icon>
 
           <el-date-picker
             v-if="timeType === 'day'"
@@ -109,6 +109,40 @@
           <template #header><div style="font-size:14px;font-weight:600">能耗数据</div></template>
           <div ref="chartRef" style="width:100%;height:420px"></div>
         </el-card>
+
+        <!-- 汇总卡片 -->
+        <el-card v-if="summaryData" shadow="hover" style="margin-top: 12px">
+          <template #header>
+            <div style="font-size: 14px; font-weight: 600">数据概览</div>
+          </template>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">能耗合计</span>
+              <span class="summary-value">{{ summaryData.total_energy }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">单位面积能耗</span>
+              <span class="summary-value">{{ summaryData.per_area_energy }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">参考价值</span>
+              <span class="summary-value">{{ summaryData.reference_value }}</span>
+              <span class="summary-unit">元</span>
+            </div>
+            <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
+              <span class="summary-label">
+                能耗趋势
+                <span v-if="summaryData.trend < 0" class="trend-arrow">↓</span>
+                <span v-else-if="summaryData.trend > 0" class="trend-arrow">↑</span>
+                <span v-else class="trend-arrow">→</span>
+              </span>
+              <span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span>
+              <span class="summary-unit">较上期</span>
+            </div>
+          </div>
+        </el-card>
       </el-col>
     </el-row>
   </div>
@@ -130,11 +164,14 @@ const chartRef = ref(null)
 let chartInstance: echarts.ECharts | null = null
 
 const convertBtns = [
+  { type: 3, label: '分项能耗' },
   { type: 1, label: '标准煤' },
   { type: 2, label: '碳排量' },
-  { type: 3, label: '原始数据' }
+  { type: 4, label: '单位面积能耗' },
 ]
 const conversionType = ref(3)
+const summaryData = ref<any>(null)
+const conversionInfo = ref<any>(null)
 const compareMode = ref(1)
 const timeType = ref('day')
 const dateSingle = ref(new Date().toISOString().slice(0, 10))
@@ -165,7 +202,11 @@ async function doSearch() {
   loading.value = true
   try {
     const r = await getEnergyAnalysis(p)
-    if (r.success && r.data) renderChart(r.data)
+    if (r.success) {
+      summaryData.value = r.summary || null
+      conversionInfo.value = r.conversion || null
+      renderChart(r)
+    }
   } catch { ElMessage.error('查询失败') }
   finally { loading.value = false }
 }
@@ -177,7 +218,7 @@ function renderChart(data: any) {
     tooltip: { trigger: 'axis' },
     legend: { data: (data.series || []).map((s: any) => s.name) },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: data.categories || [] },
+    xAxis: { type: 'category', data: data.times || data.categories || [] },
     yAxis: { type: 'value' },
     series: (data.series || []).map((s: any) => ({
       name: s.name, type: 'line', data: s.data, smooth: true
@@ -191,11 +232,55 @@ watch(() => app.buildingSign, () => { loadTree() })
 </script>
 <style scoped>
 .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar .filter-group { margin-left: auto; }
 .convert-group { display: flex; align-items: center; gap: 4px; }
 .filter-group { display: flex; align-items: center; gap: 6px; }
 .label { font-size: 13px; color: #666; white-space: nowrap; }
 .ml-2 { margin-left: 8px; }
-.tree-card { height: calc(100vh - 220px); overflow-y: auto; }
-.tree-header { display: flex; align-items: center; justify-content: space-between; }
+.tree-card { height: calc(100vh - 220px); overflow-y: auto; border-radius: 10px; }
+.tree-header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; color: #1a1a2e; }
 .tree-actions { display: flex; gap: 4px; }
+.summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #fafafa;
+  border-radius: 6px;
+  min-width: 140px;
+}
+.summary-label {
+  font-size: 13px;
+  color: #666;
+}
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1890ff;
+}
+.summary-unit {
+  font-size: 12px;
+  color: #999;
+}
+.summary-item.trend-down {
+  background: #fff1f0;
+}
+.summary-item.trend-down .summary-value {
+  color: #f5222d;
+}
+.summary-item.trend-up {
+  background: #f6ffed;
+}
+.summary-item.trend-up .summary-value {
+  color: #52c41a;
+}
+.trend-arrow {
+  font-size: 14px;
+  margin-left: 2px;
+}
 </style>
