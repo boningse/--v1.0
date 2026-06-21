@@ -201,7 +201,7 @@ async def energy_analysis(
 
     def _agg_data(item_id, exclude_ids=None):
         """递归获取分项数据：自身有数据用自身，否则加总子项"""
-        vals = [round(time_data.get(t, {}).get(item_id, 0), 2) for t in times]
+        vals = [round(time_data.get(t, {}).get(item_id, 0), 3) for t in times]
         if any(v != 0 for v in vals):
             return vals
         subs = [node for node in all_items if node.get("ParentId") == item_id]
@@ -220,7 +220,7 @@ async def energy_analysis(
     series = []
     for item in items:
         exclude = {16, 17, 18} if item["id"] == 1 else None
-        data_vals = [round(v, 2) for v in _agg_data(item["id"], exclude)]
+        data_vals = [round(v, 3) for v in _agg_data(item["id"], exclude)]
         series.append({"name": item["name"], "data": data_vals})
 
     # 合计
@@ -229,14 +229,14 @@ async def energy_analysis(
         total = 0
         for item in items:
             total += series[items.index(item)]["data"][i] if items else 0
-        totals.append(round(total, 2))
+        totals.append(round(total, 3))
     series.append({"name": "合计", "data": totals})
 
     # 汇总
-    total_energy = round(sum(totals), 2)
+    total_energy = round(sum(totals), 3)
     item_totals = {}
     for item in items:
-        item_totals[item["id"]] = round(sum(time_data[t].get(item["id"], 0) for t in times), 2)
+        item_totals[item["id"]] = round(sum(time_data[t].get(item["id"], 0) for t in times), 3)
 
     # === 建筑面积 & 参考数据 ===
     area = 0.0
@@ -257,7 +257,7 @@ async def energy_analysis(
         import logging
         logging.getLogger(__name__).warning("Trend error: %s", str(_trend_err)[:200])
 
-    per_area_energy = round(total_energy / area, 2) if area > 0 else 0
+    per_area_energy = round(total_energy / area, 3) if area > 0 else 0
     reference_value = round(total_energy * price, 2)
 
     # === 能耗趋势（环比）：按视图类型对比前一周期 ===
@@ -385,16 +385,9 @@ async def energy_ratio(
                 result_totals[eid] = round(val, 2)
     elif ids:
         for eid in ids:
-            children = [n for n in all_items if n.get("ParentId") == eid]
-            if children:
-                for child in children:
-                    val = _agg_value(child["id"])
-                    if val > 0:
-                        result_totals[child["id"]] = round(val, 2)
-            else:
-                val = _agg_value(eid)
-                if val > 0:
-                    result_totals[eid] = round(val, 2)
+            val = _agg_value(eid)
+            if val > 0:
+                result_totals[eid] = round(val, 2)
     else:
         result_totals = {eid: round(v, 2) for eid, v in totals.items() if v > 0}
     totals = result_totals

@@ -113,9 +113,29 @@
           </template>
           <div class="summary-grid">
             <div class="summary-item">
-              <span class="summary-label">总能耗</span>
-              <span class="summary-value">{{ summaryData.total_energy }}</span>
+              <span class="summary-label">能耗合计</span>
+              <span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">单位面积能耗</span>
+              <span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span>
+              <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">参考价值</span>
+              <span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span>
+              <span class="summary-unit">元</span>
+            </div>
+            <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
+              <span class="summary-label">
+                能耗趋势
+                <span v-if="summaryData.trend < 0" class="trend-arrow">↓</span>
+                <span v-else-if="summaryData.trend > 0" class="trend-arrow">↑</span>
+                <span v-else class="trend-arrow">→</span>
+              </span>
+              <span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span>
+              <span class="summary-unit">较上期</span>
             </div>
           </div>
         </el-card>
@@ -125,12 +145,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { Clock, Calendar, Search } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/index'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { getEnergyItems, getEnergyRatio } from '@/api/index'
+import { getEnergyItems, getEnergyRatio, getEnergyAnalysis } from '@/api/index'
 
 const app = useAppStore()
 const loading = ref(false)
@@ -161,7 +181,14 @@ async function loadTree() {
   loading.value = true
   try {
     const r = await getEnergyItems(app.buildingSign)
-    if (r.success) treeData.value = r['总用电'] || r.data || []
+    if (r.success) {
+      treeData.value = r['总用电'] || r.data || []
+      nextTick(() => {
+        // 默认勾选四大分项: 空调用电(11), 动力用电(12), 照明插座(13), 特殊用电(14)
+        ;[11, 12, 13, 14].forEach(id => treeRef.value?.setChecked(id, true, false))
+        doSearch()
+      })
+    }
   } catch { ElMessage.error('加载用电类型失败') }
   finally { loading.value = false }
 }
@@ -169,18 +196,21 @@ async function loadTree() {
 async function doSearch() {
   const checked = treeRef.value?.getCheckedKeys() || []
   if (!checked.length) { ElMessage.warning('请选择用电类型'); return }
-  const p: any = { sign: app.buildingSign, item_ids: checked, conversion_type: conversionType.value, xdate: timeType.value }
+  const p: any = { sign: app.buildingSign, item_ids: checked.join(","), conversion_type: conversionType.value, xdate: timeType.value }
   if (timeType.value === 'day') { p.start_date = p.end_date = dateSingle.value }
-  else if (timeType.value === 'month') { p.start_date = dateMonth.value + '-01'; p.end_date = dateMonth.value + '-31' }
+  else if (timeType.value === 'month') { p.start_date = dateMonth.value + '-01'; const [y, m] = dateMonth.value.split('-').map(Number); p.end_date = dateMonth.value + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0') }
   else if (timeType.value === 'year') { p.start_date = dateYear.value + '-01-01'; p.end_date = dateYear.value + '-12-31' }
   else if (timeType.value === 'range' && dateRange.value) { p.start_date = dateRange.value[0]; p.end_date = dateRange.value[1] }
   loading.value = true
   try {
-    const r = await getEnergyRatio(p)
-    if (r.success && r.data) {
-      summaryData.value = { total_energy: r.total || 0 }
-      conversionInfo.value = r.conversion || null
-      renderChart(r.data)
+    const [ratioR, analysisR] = await Promise.all([
+      getEnergyRatio(p),
+      getEnergyAnalysis(p)
+    ])
+    if (ratioR.success && ratioR.data) {
+      summaryData.value = analysisR.summary || { total_energy: ratioR.total || 0 }
+      conversionInfo.value = analysisR.conversion || ratioR.conversion || null
+      renderChart(ratioR.data)
     }
   } catch { ElMessage.error('查询失败') }
   finally { loading.value = false }
@@ -189,12 +219,18 @@ async function doSearch() {
 function renderChart(data: any) {
   if (!chartRef.value) return
   if (!chartInstance) chartInstance = echarts.init(chartRef.value)
+  const total = data.reduce((s: number, d: any) => s + (d.value || 0), 0)
   chartInstance.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    tooltip: {
+      trigger: 'item',
+      formatter: function (params: any) {
+        return params.name + ': <strong>' + Number(params.value).toFixed(3) + '</strong> ' + (conversionInfo.value?.unit || '') + ' (' + params.percent + '%)'
+      }
+    },
     legend: { bottom: '0%' },
     series: [{
       type: 'pie', radius: ['40%', '70%'],
-      data: (data.series || []).map((s: any) => ({ name: s.name, value: s.data?.[0] || 0 })),
+      data: data,
       label: { show: true, formatter: '{b}: {d}%' }
     }]
   })

@@ -117,17 +117,17 @@
           <div class="summary-grid">
             <div class="summary-item">
               <span class="summary-label">能耗合计</span>
-              <span class="summary-value">{{ summaryData.total_energy }}</span>
+              <span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">单位面积能耗</span>
-              <span class="summary-value">{{ summaryData.per_area_energy }}</span>
+              <span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">参考价值</span>
-              <span class="summary-value">{{ summaryData.reference_value }}</span>
+              <span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span>
               <span class="summary-unit">元</span>
             </div>
             <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
@@ -296,7 +296,7 @@ function renderChart(times: string[], series: any[]) {
         params.forEach((p: any) => {
           html += `<div style="display:flex;align-items:center;gap:6px;font-size:13px">
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color}"></span>
-            ${p.seriesName}: <strong>${p.value}</strong> ${unit}
+            ${p.seriesName}: <strong>${Number(p.value).toFixed(3)}</strong> ${unit}
           </div>`
         })
         return html

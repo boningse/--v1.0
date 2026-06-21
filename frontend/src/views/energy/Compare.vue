@@ -118,17 +118,17 @@
           <div class="summary-grid">
             <div class="summary-item">
               <span class="summary-label">能耗合计</span>
-              <span class="summary-value">{{ summaryData.total_energy }}</span>
+              <span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">单位面积能耗</span>
-              <span class="summary-value">{{ summaryData.per_area_energy }}</span>
+              <span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span>
               <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">参考价值</span>
-              <span class="summary-value">{{ summaryData.reference_value }}</span>
+              <span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span>
               <span class="summary-unit">元</span>
             </div>
             <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { Clock, Calendar, Search } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/index'
 import { ElMessage } from 'element-plus'
@@ -186,7 +186,14 @@ async function loadTree() {
   loading.value = true
   try {
     const r = await getEnergyItems(app.buildingSign)
-    if (r.success) treeData.value = r['总用电'] || r.data || []
+    if (r.success) {
+      treeData.value = r['总用电'] || r.data || []
+      nextTick(() => {
+        // 默认勾选四大分项: 空调用电(11), 动力用电(12), 照明插座(13), 特殊用电(14)
+        ;[11, 12, 13, 14].forEach(id => treeRef.value?.setChecked(id, true, false))
+        doSearch()
+      })
+    }
   } catch { ElMessage.error('加载用电类型失败') }
   finally { loading.value = false }
 }
@@ -194,7 +201,7 @@ async function loadTree() {
 async function doSearch() {
   const checked = treeRef.value?.getCheckedKeys() || []
   if (!checked.length) { ElMessage.warning('请选择用电类型'); return }
-  const p: any = { sign: app.buildingSign, item_ids: checked, conversion_type: conversionType.value, xdate: timeType.value, compare_mode: compareMode.value }
+  const p: any = { sign: app.buildingSign, item_ids: checked.join(","), conversion_type: conversionType.value, xdate: timeType.value, compare_mode: compareMode.value }
   if (timeType.value === 'day') { p.start_date = p.end_date = dateSingle.value }
   else if (timeType.value === 'month') { p.start_date = dateMonth.value + '-01'; p.end_date = dateMonth.value + '-31' }
   else if (timeType.value === 'year') { p.start_date = dateYear.value + '-01-01'; p.end_date = dateYear.value + '-12-31' }
@@ -214,13 +221,25 @@ async function doSearch() {
 function renderChart(data: any) {
   if (!chartRef.value) return
   if (!chartInstance) chartInstance = echarts.init(chartRef.value)
+  const filteredSeries = (data.series || []).filter((s: any) => s.name !== '\u5408\u8ba1')
   chartInstance.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: (data.series || []).map((s: any) => s.name) },
+    tooltip: {
+      trigger: 'axis',
+      formatter: function (params: any) {
+        if (!params || !params.length) return ''
+        let html = '<div style="font-weight:600;margin-bottom:4px">' + params[0].axisValue + '</div>'
+        const unit = conversionInfo.value?.unit || ''
+        params.forEach(function (p: any) {
+          html += '<div style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + '"></span>' + p.seriesName + ': <strong>' + Number(p.value).toFixed(3) + '</strong> ' + unit + '</div>'
+        })
+        return html
+      }
+    },
+    legend: { data: filteredSeries.map((s: any) => s.name) },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: { type: 'category', data: data.times || data.categories || [] },
-    yAxis: { type: 'value' },
-    series: (data.series || []).map((s: any) => ({
+    yAxis: { type: 'value', name: conversionInfo.value?.unit || '' },
+    series: filteredSeries.map((s: any) => ({
       name: s.name, type: 'line', data: s.data, smooth: true
     }))
   })
