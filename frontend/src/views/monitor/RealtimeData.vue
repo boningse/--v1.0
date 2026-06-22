@@ -1,6 +1,5 @@
 <template>
   <div class="realtime-data">
-    <!-- ====== 主体: 左侧设备树 + 右侧仪表盘 ====== -->
     <el-row :gutter="16">
       <el-col :span="5">
         <el-card shadow="hover" class="tree-card">
@@ -13,33 +12,46 @@
               </div>
             </div>
           </template>
-            <el-tree
+          <el-tree
             ref="treeRef"
             :data="treeData"
             :props="{ children: 'children', label: 'name' }"
             node-key="id"
             show-checkbox
-            check-strictly
             default-expand-all
             highlight-current
             @check="onTreeCheck"
           />
-          </el-card>
+        </el-card>
       </el-col>
       <el-col :span="19">
         <el-card shadow="hover">
-          <template #header><div style="font-size:14px;font-weight:600">仪表数据</div></template>
-          <div v-loading="loading" style="min-height:200px">
-            <el-row :gutter="12">
+          <template #header>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:14px;font-weight:600">仪表数据</span>
+              <span style="font-size:12px;color:#999">
+                <el-button link size="small" :icon="Search" :loading="loading" @click="refreshData">刷新</el-button>
+              </span>
+            </div>
+          </template>
+          <div style="min-height:200px">
+            <el-row :gutter="12" v-if="meterData.length">
               <el-col :span="8" v-for="item in meterData" :key="item.id" style="margin-bottom:12px">
                 <el-card shadow="hover" :body-style="{padding:'14px'}">
-                  <div style="font-size:12px;color:#8c8c8c">{{ item.name }}</div>
-                  <div style="font-size:24px;font-weight:700;color:#1a1a2e;margin:6px 0">{{ item.value }}</div>
-                  <div style="font-size:11px;color:#bfbfbf">更新时间: {{ item.time }}</div>
+                  <div style="font-size:12px;color:#8c8c8c;display:flex;align-items:center;gap:6px">
+                    <span :style="{display:'inline-block',width:8,height:8,borderRadius:'50%',background:item.has_data?'#52c41a':'#ff4d4f'}"></span>
+                    {{ item.name }}
+                  </div>
+                  <div style="font-size:24px;font-weight:700;color:#1a1a2e;margin:6px 0">
+                    {{ item.value !== null && item.value !== undefined ? Number(item.value).toFixed(2) : '--' }}
+                  </div>
+                  <div style="font-size:11px;color:#bfbfbf">
+                    {{ item.has_data ? ('更新时间: ' + (item.update_time || '--')) : '无数据' }}
+                  </div>
                 </el-card>
               </el-col>
             </el-row>
-            <el-empty v-if="!meterData.length && !loading" description="暂无数据" />
+            <el-empty v-if="!meterData.length && !loading" description="请勾选支路查看实时数据" />
           </div>
         </el-card>
       </el-col>
@@ -48,57 +60,76 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/index'
 import { ElMessage } from 'element-plus'
-import { getMeterList } from '@/api/index'
+import { getServiceTree, getMeterData } from '@/api/index'
 
 const app = useAppStore()
 const loading = ref(false)
-const treeData = ref([])
-const treeRef = ref(null)
+const treeData = ref<any[]>([])
+const treeRef = ref<any>(null)
 const meterData = ref<any[]>([])
+let refreshTimer: any = null
 
 async function loadTree() {
-  loading.value = true
   try {
-    const r = await getMeterList(app.buildingSign)
-    if (r.success) treeData.value = r['总用电'] || r.data || []
-  } catch { ElMessage.error('加载支路列表失败') }
-  finally { loading.value = false }
+    const r = await getServiceTree(app.buildingSign)
+    if (r.success) treeData.value = r.data || []
+  } catch {
+    ElMessage.error('加载支路列表失败')
+  }
 }
 
 function onTreeCheck() {
   const checked = treeRef.value?.getCheckedKeys() || []
   if (checked.length) loadMeterData(checked)
+  else meterData.value = []
 }
 
-function checkAll() { treeRef.value?.setCheckedKeys(treeData.value.map((n: any) => n.id)) }
-function uncheckAll() { treeRef.value?.setCheckedKeys([]) }
+function checkAll() {
+  treeRef.value?.setCheckedKeys(treeData.value.map((n: any) => n.id))
+}
+
+function uncheckAll() {
+  treeRef.value?.setCheckedKeys([])
+  meterData.value = []
+}
 
 async function loadMeterData(ids: number[]) {
+  if (!ids.length) { meterData.value = []; return }
   loading.value = true
   try {
-    const r = await getMeterList(app.buildingSign)
-    if (r.success) {
-      const all = r.data || []
-      const flat: any[] = []
-      function walk(nodes: any[]) {
-        for (const n of nodes) {
-          if (ids.includes(n.id) && !n.children) flat.push(n)
-          if (n.children) walk(n.children)
-        }
-      }
-      walk(all)
-      meterData.value = flat
-    }
-  } catch { ElMessage.error('加载仪表数据失败') }
-  finally { loading.value = false }
+    const r = await getMeterData({ sign: app.buildingSign, selectedids: ids.join(',') })
+    if (r.success) meterData.value = r.data || []
+  } catch {
+    ElMessage.error('加载仪表数据失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-onMounted(() => { loadTree() })
-watch(() => app.buildingSign, () => { loadTree() })
+function refreshData() {
+  const checked = treeRef.value?.getCheckedKeys() || []
+  if (checked.length) loadMeterData(checked)
+}
+
+onMounted(() => {
+  loadTree()
+  refreshTimer = setInterval(refreshData, 30000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
+
+watch(() => app.buildingSign, () => {
+  meterData.value = []
+  loadTree()
+})
 </script>
+
 <style scoped>
 .tree-card { height: calc(100vh - 140px); overflow-y: auto; }
 .tree-header { display: flex; align-items: center; justify-content: space-between; }
