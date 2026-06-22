@@ -36,16 +36,16 @@
           </template>
           <div style="min-height:200px">
             <el-row :gutter="12" v-if="meterData.length">
-              <el-col :span="8" v-for="item in meterData" :key="item.id" style="margin-bottom:12px">
-                <el-card shadow="hover" :body-style="{padding:'14px'}">
-                  <div style="font-size:12px;color:#8c8c8c;display:flex;align-items:center;gap:6px">
-                    <span :style="{display:'inline-block',width:8,height:8,borderRadius:'50%',background:item.has_data?'#52c41a':'#ff4d4f'}"></span>
+              <el-col :span="6" v-for="item in meterData" :key="item.id" style="margin-bottom:12px">
+                <el-card shadow="never" class="meter-card" :class="{ 'no-data': !item.has_data }" :body-style="{padding:'14px'}">
+                  <div class="meter-name">
+                    <span :class="['status-dot', item.has_data ? 'online' : 'offline']"></span>
                     {{ item.name }}
                   </div>
-                  <div style="font-size:24px;font-weight:700;color:#1a1a2e;margin:6px 0">
+                  <div class="meter-value">
                     {{ item.value !== null && item.value !== undefined ? Number(item.value).toFixed(2) : '--' }}
                   </div>
-                  <div style="font-size:11px;color:#bfbfbf">
+                  <div class="meter-time">
                     {{ item.has_data ? ('更新时间: ' + (item.update_time || '--')) : '无数据' }}
                   </div>
                 </el-card>
@@ -131,7 +131,73 @@ watch(() => app.buildingSign, () => {
 </script>
 
 <style scoped>
-.tree-card { height: calc(100vh - 140px); overflow-y: auto; }
-.tree-header { display: flex; align-items: center; justify-content: space-between; }
-.tree-actions { display: flex; gap: 4px; }
+.tree-card {
+  height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+.tree-card .el-card__header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 16px;
+}
+.tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.tree-actions {
+  display: flex;
+  gap: 4px;
+}
+.tree-actions .el-button {
+  font-size: 12px;
+}
+
+/* 仪表卡片 - 全新设计 */
+.meter-card {
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border-left: 4px solid #d9d9d9;
+  transition: transform .2s, box-shadow .2s;
+}
+.meter-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
+}
+.meter-card:nth-child(4n+1) { border-left-color: #13c785; }
+.meter-card:nth-child(4n+2) { border-left-color: #1890ff; }
+.meter-card:nth-child(4n+3) { border-left-color: #fa8c16; }
+.meter-card:nth-child(4n+4) { border-left-color: #722ed1; }
+.meter-card.offline { border-left-color: #d9d9d9; }
+.meter-card .meter-name {
+  font-size: 13px;
+  color: #595959;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.meter-card .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.meter-card .status-dot.online { background: #52c41a; }
+.meter-card .status-dot.offline { background: #ff4d4f; }
+.meter-card.no-data .meter-time { color: #ff4d4f; font-weight: 500; }
+.meter-card.no-data .meter-value { color: #ff4d4f; }
+.meter-card .meter-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 4px 0;
+  line-height: 1.2;
+}
+.meter-card .meter-time {
+  font-size: 11px;
+  color: #bfbfbf;
+}
 </style>
