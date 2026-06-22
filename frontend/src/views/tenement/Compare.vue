@@ -144,8 +144,19 @@ async function loadTree() {
     if (r.success) {
       treeData.value = r.tree || r.data || [];
       nextTick(() => {
-        const first = treeData.value?.[0]
-        if (first) doSearch()
+        const allIds: number[] = []
+        function collectLeafIds(nodes: any[]) {
+          for (const n of nodes) {
+            if (n.children?.length) collectLeafIds(n.children)
+            else allIds.push(n.id)
+          }
+        }
+        collectLeafIds(treeData.value)
+        const first5 = allIds.slice(0, 5)
+        if (first5.length) {
+          treeRef.value?.setCheckedKeys(first5)
+          doSearch()
+        }
       })
     }
   } catch { ElMessage.error('加载分户列表失败') }
@@ -211,22 +222,88 @@ watch(() => app.buildingSign, () => { loadTree() })
 watch(energyType, () => { loadTree() })
 </script>
 <style scoped>
-.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; } .toolbar .filter-group { margin-left: auto; }
-.convert-group { display: flex; align-items: center; gap: 4px; }
-.filter-group { display: flex; align-items: center; gap: 6px; }
-.label { font-size: 13px; color: #666; white-space: nowrap; }
-.ml-2 { margin-left: 8px; }
-.tree-card { height: calc(100vh - 220px); overflow-y: auto; }
-.tree-header { display: flex; align-items: center; justify-content: space-between; }
-.tree-actions { display: flex; gap: 4px; }
-.summary-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-.summary-item { display: flex; align-items: baseline; gap: 6px; padding: 8px 16px; background: #fafafa; border-radius: 6px; min-width: 140px; }
-.summary-label { font-size: 13px; color: #666; }
-.summary-value { font-size: 18px; font-weight: 700; color: #1890ff; }
-.summary-unit { font-size: 12px; color: #999; }
-.summary-item.trend-down { background: #fff1f0; }
-.summary-item.trend-down .summary-value { color: #f5222d; }
-.summary-item.trend-up { background: #f6ffed; }
-.summary-item.trend-up .summary-value { color: #52c41a; }
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.toolbar .filter-group {
+  margin-left: auto;
+}
+.convert-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.convert-group .el-button-group .el-button {
+  font-size: 12px;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.label {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+}
+.ml-2 {
+  margin-left: 8px;
+}
+.tree-card {
+  height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+.tree-card .el-card__header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 16px;
+}
+.tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.tree-actions .el-button {
+  font-size: 12px;
+}
+
+/* === 美观大气的数据概览卡片 === */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.summary-item {
+  border-radius: 10px;
+  padding: 18px 20px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  transition: transform .2s, box-shadow .2s;
+  cursor: default;
+}
+.summary-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.summary-item:nth-child(1) { background: linear-gradient(135deg,#13c785,#0fa86b); }
+.summary-item:nth-child(2) { background: linear-gradient(135deg,#1890ff,#40a9ff); }
+.summary-item:nth-child(3) { background: linear-gradient(135deg,#fa8c16,#ffa940); }
+.summary-item:nth-child(4) { background: linear-gradient(135deg,#722ed1,#b37feb); }
+.summary-label { font-size: 12px; opacity: .8; margin-bottom: 2px; }
+.summary-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.summary-unit { font-size: 12px; font-weight: 400; opacity: .7; margin-left: 4px; }
+.summary-item.trend-down { background: linear-gradient(135deg,#ff4d4f,#cf1322); }
+.summary-item.trend-up { background: linear-gradient(135deg,#52c41a,#389e0d); }
 .trend-arrow { font-size: 14px; margin-left: 2px; }
+
+@media (max-width: 992px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 576px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
 </style>

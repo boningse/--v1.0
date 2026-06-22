@@ -39,6 +39,7 @@
           <template #header>
             <div class="tree-header">
               <span>设备列表</span>
+              
 
             </div>
 
@@ -138,11 +139,7 @@ async function loadTree() {
     if (r.success) {
       treeData.value = r.tree || r.data || []
       nextTick(() => {
-        const first = treeData.value?.[0]
-        if (first) {
-          treeRef.value?.setCurrentKey(first.id)
-          doSearch()
-        }
+        doSearch()
       })
     }
   } catch { ElMessage.error('加载设备列表失败') }
@@ -151,8 +148,21 @@ async function loadTree() {
 
 async function doSearch() {
   const selectedId = treeRef.value?.getCurrentKey()
-  if (!selectedId) { ElMessage.warning('请选择设备'); return }
-  const p: any = { sign: app.buildingSign, item_ids: String(selectedId), conversion_type: conversionType.value, xdate: timeType.value }
+  const p: any = { sign: app.buildingSign, conversion_type: conversionType.value, xdate: timeType.value }
+  if (selectedId) {
+    p.item_ids = String(selectedId)
+  } else {
+    // 汇总时只取叶子节点设备，排除父级
+    const leaves: number[] = []
+    function collectLeaves(nodes: any[]) {
+      for (const n of nodes) {
+        if (n.children?.length) collectLeaves(n.children)
+        else leaves.push(n.id)
+      }
+    }
+    collectLeaves(treeData.value)
+    if (leaves.length) p.item_ids = leaves.join(',')
+  }
   if (timeType.value === 'day') { p.start_date = p.end_date = dateSingle.value }
   else if (timeType.value === 'month') { const [y, m] = dateMonth.value.split('-').map(Number); p.start_date = dateMonth.value + '-01'; p.end_date = dateMonth.value + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0') }
   else if (timeType.value === 'year') { p.start_date = dateYear.value + '-01-01'; p.end_date = dateYear.value + '-12-31' }
@@ -163,14 +173,29 @@ async function doSearch() {
     if (r.success && r.data) {
       conversionInfo.value = r.conversion || null
       summaryData.value = r.summary || null
-      renderChart({
-        categories: r.times || [],
-        series: (r.data || []).map((t: any) => ({ name: t.name, data: t.data }))
-      })
+      if (r.data?.length === 1) {
+        // 单设备选中
+        renderChart({
+          categories: r.times || [],
+          series: [{ name: r.data[0].name, data: r.data[0].data }]
+        })
+      } else {
+        // 未选中设备：汇总所有设备为总能耗
+        const totalData = (r.data || []).reduce((acc: number[], t: any) => {
+          t.data.forEach((v: number, i: number) => { acc[i] = (acc[i] || 0) + v })
+          return acc
+        }, [])
+        renderChart({
+          categories: r.times || [],
+          series: [{ name: '设备总能耗', data: totalData }]
+        })
+      }
     }
   } catch { ElMessage.error('查询失败') }
   finally { loading.value = false }
 }
+
+function onTreeNodeClick() { doSearch() }
 
 function renderChart(data: any) {
   if (!chartRef.value) return
@@ -200,27 +225,95 @@ function renderChart(data: any) {
   })
 }
 
-function onTreeNodeClick() { doSearch() }
+
+
+
 onMounted(() => { loadTree() })
 watch(() => app.buildingSign, () => { loadTree() })
 </script>
 <style scoped>
-.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; } .toolbar .filter-group { margin-left: auto; }
-.convert-group { display: flex; align-items: center; gap: 4px; }
-.filter-group { display: flex; align-items: center; gap: 6px; }
-.label { font-size: 13px; color: #666; white-space: nowrap; }
-.ml-2 { margin-left: 8px; }
-.tree-card { height: calc(100vh - 220px); overflow-y: auto; }
-.tree-header { display: flex; align-items: center; justify-content: space-between; }
-.tree-actions { display: flex; gap: 4px; }
-.summary-grid { display: flex; flex-wrap: wrap; gap: 16px; }
-.summary-item { display: flex; align-items: baseline; gap: 6px; padding: 8px 16px; background: #fafafa; border-radius: 6px; min-width: 140px; }
-.summary-label { font-size: 13px; color: #666; }
-.summary-value { font-size: 18px; font-weight: 700; color: #1890ff; }
-.summary-unit { font-size: 12px; color: #999; }
-.summary-item.trend-down { background: #fff1f0; }
-.summary-item.trend-down .summary-value { color: #f5222d; }
-.summary-item.trend-up { background: #f6ffed; }
-.summary-item.trend-up .summary-value { color: #52c41a; }
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.toolbar .filter-group {
+  margin-left: auto;
+}
+.convert-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.convert-group .el-button-group .el-button {
+  font-size: 12px;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.label {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+}
+.ml-2 {
+  margin-left: 8px;
+}
+.tree-card {
+  height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+.tree-card .el-card__header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 12px 16px;
+}
+.tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.tree-actions .el-button {
+  font-size: 12px;
+}
+
+/* === 美观大气的数据概览卡片 === */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.summary-item {
+  border-radius: 10px;
+  padding: 18px 20px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  transition: transform .2s, box-shadow .2s;
+  cursor: default;
+}
+.summary-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.summary-item:nth-child(1) { background: linear-gradient(135deg,#13c785,#0fa86b); }
+.summary-item:nth-child(2) { background: linear-gradient(135deg,#1890ff,#40a9ff); }
+.summary-item:nth-child(3) { background: linear-gradient(135deg,#fa8c16,#ffa940); }
+.summary-item:nth-child(4) { background: linear-gradient(135deg,#722ed1,#b37feb); }
+.summary-label { font-size: 12px; opacity: .8; margin-bottom: 2px; }
+.summary-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.summary-unit { font-size: 12px; font-weight: 400; opacity: .7; margin-left: 4px; }
+.summary-item.trend-down { background: linear-gradient(135deg,#ff4d4f,#cf1322); }
+.summary-item.trend-up { background: linear-gradient(135deg,#52c41a,#389e0d); }
 .trend-arrow { font-size: 14px; margin-left: 2px; }
+
+@media (max-width: 992px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 576px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
 </style>
