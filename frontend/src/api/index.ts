@@ -14,6 +14,8 @@ export const getServiceEnergy = (p: any) => r.get('/monitor/service/energy', { p
 export const getMeterList = (sign: string) => r.get('/monitor/meter/list', { params: { sign } })
 export const getServiceTree = (sign: string) => r.get('/monitor/service/tree', { params: { sign } })
 export const getMeterData = (p: any) => r.get('/monitor/meter/data', { params: p })
+export const getMonitorAlerts = (sign: string) => r.get('/monitor/alerts', { params: { sign } })
+export const getServiceReport = (p: any) => r.get('/monitor/service/report', { params: p })
 export const getGeneralReport = (p: any) => r.get('/report/general', { params: p })
 export const getBranchReport = (p: any) => r.get('/report/branch', { params: p })
 export const getCustomReport = (p: any) => r.get('/report/custom', { params: p })
