@@ -1,108 +1,73 @@
 <template>
-  <div class="report-branch">
+  <div class="report-page">
     <el-card shadow="hover">
-      <template #header>
-        <div class="report-header">
-          <div class="report-title">支路能耗报表</div>
-          <div class="report-controls">
-            <el-select v-model="energyType" size="small" style="width:100px" @change="load">
-              <el-option v-for="et in energyTypes" :key="et.id" :label="et.name" :value="et.id" />
-            </el-select>
-            <el-date-picker v-model="dates" type="daterange" value-format="YYYY-MM-DD" size="small" @change="load" style="width:240px" />
-            <el-button type="primary" size="small" @click="exportCSV">导出CSV</el-button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 指标卡片 -->
-      <el-row :gutter="16" style="margin-bottom:16px">
-        <el-col :span="8"><div class="metric-card"><div class="metric-label">统计周期</div><div class="metric-value">{{ dates[0] || '--' }} ~ {{ dates[1] || '--' }}</div></div></el-col>
-        <el-col :span="8"><div class="metric-card"><div class="metric-label">支路总数</div><div class="metric-value">{{ tableData.length }}<span class="metric-unit"> 条</span></div></div></el-col>
-        <el-col :span="8"><div class="metric-card"><div class="metric-label">合计能耗</div><div class="metric-value">{{ fmtNum(allTotal) }}<span class="metric-unit"> kWh</span></div></div></el-col>
-      </el-row>
-
-      <!-- 支路数据表 -->
-      <el-table :data="tableData" stripe border size="small" max-height="520" show-summary :summary-method="getSummaries">
-        <el-table-column type="index" width="50" label="#" fixed />
-        <el-table-column prop="name" label="支路名称" width="200" fixed />
-        <el-table-column :prop="d" :label="d" min-width="90" v-for="d in days" :key="d">
-          <template #default="{ row }">{{ row[d] ? Number(row[d]).toFixed(2) : '--' }}</template>
+      <div class="toolbar">
+        <span class="label">时间范围</span>
+        <el-date-picker v-model="dateRange" type="daterange" value-format="YYYY-MM-DD" size="small" style="width:240px" range-separator=" - " />
+        <el-select v-model="conversionType" size="small" style="width:100px">
+          <el-option label="原始数据" :value="3" /><el-option label="标准煤" :value="1" /><el-option label="碳排量" :value="2" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="loading" @click="doQuery">查询</el-button>
+        <el-button size="small" @click="doPrint">打印</el-button>
+      </div>
+    </el-card>
+    <div id="printArea" class="report-content" style="margin-top:12px">
+      <div class="report-title">分户能耗报表</div>
+      <div class="report-date">{{ dateRange?.[0] }} ~ {{ dateRange?.[1] }}</div>
+      <el-table :data="tableData" border stripe size="small" v-loading="loading" style="width:100%">
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column prop="name" label="分户名称" min-width="180" />
+        <el-table-column label="能耗值" width="140" align="right">
+          <template #default="{row}">{{ Number(row.total).toFixed(3) }}</template>
         </el-table-column>
-        <el-table-column prop="_total" label="合计" width="110" fixed="right" sortable>
-          <template #default="{ row }">{{ fmtNum(row._total) }}</template>
+        <el-table-column label="占比(%)" width="100" align="right">
+          <template #default="{row}">{{ row.pct }}%</template>
         </el-table-column>
       </el-table>
-    </el-card>
+      <div v-if="summary" class="report-summary">
+        <span>合计: <strong>{{ Number(summary.total_energy).toFixed(3) }}</strong> {{ conversionInfo?.unit }}</span>
+        <span style="margin-left:20px">单位面积: <strong>{{ Number(summary.per_area_energy).toFixed(3) }}</strong> {{ conversionInfo?.unit }}/m²</span>
+        <span style="margin-left:20px">参考价值: <strong>{{ Number(summary.reference_value).toFixed(2) }}</strong> 元</span>
+      </div>
+    </div>
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useAppStore } from '@/stores/index'
-import { getBranchReport } from '@/api/index'
-import { fmtNum, today, monthStart } from '@/utils/index'
-
+import { ElMessage } from 'element-plus'
+import { getTenementAnalysis } from '@/api/index'
 const app = useAppStore()
-const dates = ref<[string, string]>([monthStart(), today()])
-const energyType = ref(1)
-const energyTypes = [
-  { id: 1, name: '电' }, { id: 2, name: '水' }, { id: 3, name: '冷量' },
-  { id: 4, name: '热量' }, { id: 5, name: '燃气' }, { id: 6, name: '蒸汽' },
-]
-const days = ref<string[]>([])
+const loading = ref(false)
+const now = new Date()
+const dateRange = ref<any[]>([`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`, now.toISOString().slice(0,10)])
+const conversionType = ref(3)
+const conversionInfo = ref<any>(null)
+const summary = ref<any>(null)
 const tableData = ref<any[]>([])
-const allTotal = ref(0)
-
-async function load() {
-  const [s, e] = dates.value || []
-  if (!s || !e) return
-  const res: any = await getBranchReport({
-    sign: app.buildingSign, start_date: s, end_date: e, energy_type: energyType.value,
-  })
-  if (res.success) {
-    days.value = res.data.days || []
-    const items = (res.data.services || []).map((r: any) => {
-      const total = days.value.reduce((s: number, d: string) => s + (Number(r[d]) || 0), 0)
-      return { ...r, _total: Math.round(total * 100) / 100 }
-    })
-    tableData.value = items
-    allTotal.value = items.reduce((s: number, r: any) => s + r._total, 0)
-  }
+async function doQuery() {
+  if (!dateRange.value?.[0]) return ElMessage.warning('请选择时间')
+  loading.value = true
+  try {
+    const r = await getTenementAnalysis({ sign: app.buildingSign, item_ids: '', start_date: dateRange.value[0], end_date: dateRange.value[1], xdate: 'range', conversion_type: conversionType.value, energy_type: 1 })
+    if (r.success) {
+      conversionInfo.value = r.conversion
+      summary.value = r.summary
+      const items = r.data || []
+      const total = items.reduce((s: number, t: any) => s + (t.total || 0), 0) || 1
+      tableData.value = items.map((t: any) => ({ name: t.name, total: t.total || 0, pct: total > 0 ? (t.total / total * 100).toFixed(1) : '0' }))
+    }
+  } catch { ElMessage.error('查询失败') }
+  finally { loading.value = false }
 }
-
-function getSummaries(param: any) {
-  const { columns, data } = param
-  const sums: string[] = ['合计']
-  for (let i = 1; i < columns.length; i++) {
-    const col = columns[i].property
-    if (col === 'index') { sums.push(''); continue }
-    const sum = data.reduce((a: number, r: any) => a + (Number(r[col]) || 0), 0)
-    sums.push(col === '_total' ? Math.round(sum * 100) / 100 + '' : Math.round(sum * 100) / 100 + '')
-  }
-  return sums
-}
-
-function exportCSV() {
-  if (!tableData.value.length) return
-  const headers = ['支路名称', ...days.value, '合计']
-  const csv = headers.join(',') + '\n' + tableData.value.map(r =>
-    [r.name, ...days.value.map(d => r[d] || 0), r._total].join(',')
-  ).join('\n')
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-  a.download = `branch_report_${dates.value[0]}_${dates.value[1]}.csv`; a.click()
-}
-
-onMounted(load)
+function doPrint() { window.print() }
 </script>
-
 <style scoped>
-.report-branch { display: flex; flex-direction: column; gap: 0; }
-.report-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-.report-title { font-size: 16px; font-weight: 600; }
-.report-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.metric-card { background: #f5f7fa; border-radius: 8px; padding: 16px 20px; border: 1px solid #e8eaef; }
-.metric-label { font-size: 13px; color: #8c8c8c; margin-bottom: 4px; }
-.metric-value { font-size: 18px; font-weight: 700; color: #1a1a2e; }
-.metric-unit { font-size: 12px; font-weight: 400; color: #8c8c8c; }
+.toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap }
+.label { font-size:13px;color:#666;white-space:nowrap }
+.report-content { background:#fff;padding:20px;border-radius:8px }
+.report-title { font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;color:#1a1a2e }
+.report-date { font-size:12px;text-align:center;color:#8c8c8c;margin-bottom:16px }
+.report-summary { margin-top:12px;padding:12px 16px;background:#fafafa;border-radius:6px;font-size:13px;color:#595959 }
+@media print { .toolbar { display:none } .report-content { padding:0 } }
 </style>

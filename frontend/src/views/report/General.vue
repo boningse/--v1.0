@@ -1,161 +1,168 @@
 <template>
-  <div class="report-general">
+  <div class="report-page">
     <el-card shadow="hover">
-      <template #header>
-        <div class="report-header">
-          <div class="report-title">通用能耗报表</div>
-          <div class="report-controls">
-            <el-date-picker v-model="monthVal" type="month" value-format="YYYYMM" size="small" @change="load" style="width:140px" />
-            <el-button type="primary" size="small" @click="exportCSV">导出CSV</el-button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 指标卡片 -->
-      <el-row :gutter="16" style="margin-bottom:16px">
-        <el-col :span="6"><div class="metric-card"><div class="metric-label">月度总能耗</div><div class="metric-value">{{ fmtNum(monthlyTotal) }}<span class="metric-unit"> kWh</span></div></div></el-col>
-        <el-col :span="6"><div class="metric-card"><div class="metric-label">日均能耗</div><div class="metric-value">{{ fmtNum(dailyAvg) }}<span class="metric-unit"> kWh</span></div></div></el-col>
-        <el-col :span="6"><div class="metric-card"><div class="metric-label">最大日能耗</div><div class="metric-value">{{ fmtNum(maxDay) }}<span class="metric-unit"> kWh</span></div></div></el-col>
-        <el-col :span="6"><div class="metric-card"><div class="metric-label">数据天数</div><div class="metric-value">{{ dailyData.length }}<span class="metric-unit"> 天</span></div></div></el-col>
-      </el-row>
-
-      <!-- 每日能耗明细 -->
-      <div class="section-title">每日能耗明细</div>
-      <el-table :data="dailyData" stripe border size="small" max-height="360" show-summary :summary-method="dailySummary" style="margin-bottom:16px">
-        <el-table-column prop="date" label="日期" width="120" />
-        <el-table-column prop="total" label="日能耗(kWh)" width="140" sortable />
-        <el-table-column prop="pct" label="占比(%)" width="120">
-          <template #default="{ row }">{{ row.pct }}</template>
-        </el-table-column>
-        <el-table-column prop="cum" label="累计(kWh)" width="140" />
-        <el-table-column prop="cumPct" label="累计占比(%)" width="120" />
-      </el-table>
-
-      <!-- 支路能耗汇总 -->
-      <el-tabs style="margin-top:4px">
-        <el-tab-pane label="支路能耗汇总">
-          <el-table :data="svcData" stripe border size="small" max-height="320" show-summary :summary-method="svcSummary">
-            <el-table-column prop="name" label="支路名称" min-width="180" />
-            <el-table-column prop="total" label="能耗(kWh)" width="140" sortable />
-            <el-table-column prop="pct" label="占比(%)" width="120" />
-          </el-table>
-        </el-tab-pane>
-        <el-tab-pane label="分户能耗汇总">
-          <el-table :data="tenData" stripe border size="small" max-height="320" show-summary :summary-method="svcSummary">
-            <el-table-column prop="name" label="分户名称" min-width="180" />
-            <el-table-column prop="total" label="能耗(kWh)" width="140" sortable />
-            <el-table-column prop="pct" label="占比(%)" width="120" />
-          </el-table>
-        </el-tab-pane>
-      </el-tabs>
+      <div class="toolbar">
+        <span class="label">时间范围</span>
+        <el-date-picker v-model="dateRange" type="daterange" value-format="YYYY-MM-DD" size="small" style="width:240px" range-separator=" - " />
+        <el-select v-model="conversionType" size="small" style="width:100px">
+          <el-option label="原始数据" :value="3" /><el-option label="标准煤" :value="1" /><el-option label="碳排量" :value="2" />
+        </el-select>
+        <el-button type="primary" size="small" :loading="loading" @click="doQuery">查询</el-button>
+        <el-button size="small" @click="doPrint">打印</el-button>
+      </div>
     </el-card>
+
+    <div id="printArea" class="report-content" style="margin-top:12px">
+      <div class="report-title">分项能耗报表</div>
+      <div class="report-date">{{ dateRange?.[0] }} ~ {{ dateRange?.[1] }}</div>
+      <el-table :data="tableData" border stripe size="small" v-loading="loading" style="width:100%">
+        <el-table-column type="index" label="序号" width="60" align="center" />
+        <el-table-column label="分项名称" min-width="240">
+          <template #default="{ row }">
+            <span :style="{ paddingLeft: row.level * 20 + 'px', fontWeight: row.level === 0 ? 600 : 400, color: row.level === 0 ? '#1a1a2e' : '#595959' }">
+              {{ row.name }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期能耗" width="120" align="right">
+          <template #default="{row}">{{ Number(row.total).toFixed(3) }}</template>
+        </el-table-column>
+        <el-table-column label="上期能耗" width="120" align="right">
+          <template #default="{row}">
+            <span v-if="row.prev_total !== null">{{ Number(row.prev_total).toFixed(3) }}</span>
+            <span v-else style="color:#bfbfbf">--</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="能耗对比" width="110" align="center">
+          <template #default="{row}">
+            <span v-if="row.change !== null" :style="{ color: row.change > 0 ? '#ff4d4f' : row.change < 0 ? '#52c41a' : '#8c8c8c', fontWeight: 500 }">
+              <span v-if="row.change > 0">↑</span><span v-else-if="row.change < 0">↓</span>
+              {{ row.change }}%
+            </span>
+            <span v-else style="color:#bfbfbf">--</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占比(%)" width="80" align="right">
+          <template #default="{row}">{{ row.pct }}%</template>
+        </el-table-column>
+      </el-table>
+      <div v-if="summary" class="report-summary">
+        <span>合计: <strong>{{ Number(summary.total_energy).toFixed(3) }}</strong> {{ conversionInfo?.unit }}</span>
+        <span style="margin-left:20px">单位面积: <strong>{{ Number(summary.per_area_energy).toFixed(3) }}</strong> {{ conversionInfo?.unit }}/m²</span>
+        <span style="margin-left:20px">参考价值: <strong>{{ Number(summary.reference_value).toFixed(2) }}</strong> 元</span>
+        <span style="margin-left:20px">趋势: <strong>{{ summary.trend }}%</strong></span>
+      </div>
+    </div>
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useAppStore } from '@/stores/index'
-import { getGeneralReport } from '@/api/index'
-import { fmtNum, curMonth } from '@/utils/index'
-
+import { ElMessage } from 'element-plus'
+import { getEnergyItems, getEnergyAnalysis } from '@/api/index'
 const app = useAppStore()
-const monthVal = ref(curMonth())
-const dailyData = ref<any[]>([])
-const svcData = ref<any[]>([])
-const tenData = ref<any[]>([])
-const monthlyTotal = ref(0)
-const dailyAvg = ref(0)
-const maxDay = ref(0)
+const loading = ref(false)
+const now = new Date()
+const dateRange = ref<any[]>([`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`, now.toISOString().slice(0,10)])
+const conversionType = ref(3)
+const conversionInfo = ref<any>(null)
+const summary = ref<any>(null)
+const tableData = ref<any[]>([])
+async function doQuery() {
+  if (!dateRange.value?.[0]) return ElMessage.warning('请选择时间')
+  loading.value = true
+  try {
+    // 1. 获取分项树
+    const treeR = await getEnergyItems(app.buildingSign)
+    if (!treeR.success) { ElMessage.error('获取分项树失败'); return }
+    const tree = treeR['\u603b\u7528\u7535'] || []
+    if (!tree.length) { ElMessage.warning('无分项数据'); return }
 
-function aggregateDaily(rows: any[]): any[] {
-  const dayMap: Record<string, number> = {}
-  for (const r of rows) {
-    const d = (r.timefrom || '').slice(0, 10)
-    if (d) dayMap[d] = (dayMap[d] || 0) + Number(r.data || 0)
+    // 2. 收集启用的叶子节点ID
+    const enabledIds = []
+    const walk = (nodes: any[]) => {
+      for (const n of nodes) {
+        if (n.children?.length) walk(n.children)
+        else if (!n.disabled) enabledIds.push(n.id)
+      }
+    }
+    walk(tree)
+    const ids = enabledIds.length ? enabledIds.join(',') : 'total'
+
+    // 3. 查询本期能耗
+    const params = { sign: app.buildingSign, item_ids: ids, conversion_type: conversionType.value || 3, xdate: 'range',
+      start_date: dateRange.value[0], end_date: dateRange.value[1] }
+    const curR = await getEnergyAnalysis(params)
+    if (!curR?.success) { ElMessage.error('查询失败：API返回失败'); return }
+
+    conversionInfo.value = curR.conversion || null
+    summary.value = curR.summary || null
+
+    // 4. 建立 name→total 映射
+    const nameMap = {}
+    if (curR.series) {
+      for (const s of curR.series) {
+        if (s.name === '\u5408\u8ba1' || !s.data) continue
+        nameMap[s.name] = s.data.reduce((a, b) => a + b, 0)
+      }
+    }
+
+    // 5. 查询上期能耗（与本期等长的前一个时间段）
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const sd = new Date(dateRange.value[0])
+    const ed = new Date(dateRange.value[1])
+    const periodDays = Math.round((ed - sd) / (24 * 60 * 60 * 1000)) + 1
+    const prevEd = new Date(sd.getTime() - 24 * 60 * 60 * 1000)
+    const prevSd = new Date(prevEd.getTime() - (periodDays - 1) * 24 * 60 * 60 * 1000)
+    const prevR = await getEnergyAnalysis({ ...params, start_date: fmt(prevSd), end_date: fmt(prevEd) })
+    const nameMapPrev = {}
+    if (prevR?.success && prevR.series) {
+      for (const s of prevR.series) {
+        if (s.name === '合计' || !s.data) continue
+        nameMapPrev[s.name] = s.data.reduce((a, b) => a + b, 0)
+      }
+    }
+
+    // 6. 扁平化树，递归计算总值
+    const flatNodes = []
+    const flattenTree = (nodes, level) => {
+      if (!nodes) return
+      for (const n of nodes) {
+        flatNodes.push({ name: n.name, level, children: n.children || [] })
+        if (n.children?.length) flattenTree(n.children, level + 1)
+      }
+    }
+    flattenTree(tree, 0)
+
+    const getTotal = (node, nmap) => {
+      if (node.children?.length) {
+        return node.children.reduce((s, c) => s + getTotal(c, nmap), 0)
+      }
+      return nmap[node.name] || 0
+    }
+
+    tableData.value = flatNodes.map(n => {
+      const total = getTotal(n, nameMap)
+      const prev = getTotal(n, nameMapPrev)
+      return { name: n.name, level: n.level, total, prev_total: prev || null, change: prev ? Number(((total - prev) / prev * 100).toFixed(1)) : null }
+    })
+    const grand = tableData.value.reduce((s, r) => s + r.total, 0) || 1
+    tableData.value.forEach((r) => r.pct = (r.total / grand * 100).toFixed(1))
+  } catch (e) {
+    console.error('\u62a5\u8868\u67e5\u8be2\u9519\u8bef:', e)
+    ElMessage.error('\u67e5\u8be2\u5931\u8d25: ' + (e?.message || e?.toString() || '\u672a\u77e5\u9519\u8bef'))
   }
-  const dates = Object.keys(dayMap).sort()
-  const vals = dates.map(d => ({ date: d, total: Math.round(dayMap[d] * 100) / 100 }))
-  const sum = vals.reduce((s, v) => s + v.total, 0)
-  let cum = 0
-  vals.forEach(v => {
-    v.pct = sum > 0 ? (v.total / sum * 100).toFixed(1) : '0.0'
-    cum += v.total
-    v.cum = Math.round(cum * 100) / 100
-    v.cumPct = sum > 0 ? (cum / sum * 100).toFixed(1) : '0.0'
-  })
-  return vals
+  finally { loading.value = false }
 }
 
-async function load() {
-  const res: any = await getGeneralReport({ sign: app.buildingSign, year_month: monthVal.value })
-  if (res.success) {
-    const d = res.data
-    monthlyTotal.value = d.monthly_total || 0
-    dailyData.value = aggregateDaily(d.daily || [])
-    dailyAvg.value = dailyData.value.length > 0 ? Math.round(monthlyTotal.value / dailyData.value.length * 100) / 100 : 0
-    maxDay.value = dailyData.value.reduce((m, r) => Math.max(m, r.total), 0)
-
-    svcData.value = (d.service_summary || []).map((s: any) => ({
-      name: s.name, total: Math.round((s.total || 0) * 100) / 100,
-      pct: monthlyTotal.value > 0 ? ((s.total || 0) / monthlyTotal.value * 100).toFixed(1) : '0.0'
-    })).sort((a: any, b: any) => b.total - a.total)
-
-    tenData.value = (d.tenement_summary || []).map((t: any) => ({
-      name: t.name, total: Math.round((t.total || 0) * 100) / 100,
-      pct: monthlyTotal.value > 0 ? ((t.total || 0) / monthlyTotal.value * 100).toFixed(1) : '0.0'
-    })).sort((a: any, b: any) => b.total - a.total)
-  }
-}
-
-function dailySummary(param: any) {
-  const { columns, data } = param
-  const sums = ['']
-  for (let i = 1; i < columns.length; i++) {
-    const prop = columns[i].property
-    if (prop === 'pct' || prop === 'cumPct') { sums.push('-'); continue }
-    const total = data.reduce((s: number, r: any) => s + (Number(r[prop]) || 0), 0)
-    sums.push(prop === 'total' || prop === 'cum' ? Math.round(total * 100) / 100 + '' : total + '')
-  }
-  return ['合计', ...sums.slice(1)]
-}
-
-function svcSummary(param: any) {
-  const { columns, data } = param
-  const sums = ['合计']
-  for (let i = 1; i < columns.length; i++) {
-    const prop = columns[i].property
-    if (prop === 'pct') { sums.push('100%'); continue }
-    sums.push(Math.round(data.reduce((s: number, r: any) => s + (Number(r[prop]) || 0), 0) * 100) / 100 + '')
-  }
-  return sums
-}
-
-function exportCSV() {
-  const rows = [['日期', '日能耗(kWh)', '占比(%)', '累计(kWh)', '累计占比(%)']]
-  for (const r of dailyData.value) rows.push([r.date, String(r.total), r.pct, String(r.cum), r.cumPct])
-  rows.push([])
-  rows.push(['支路名称', '能耗(kWh)', '占比(%)'])
-  for (const r of svcData.value) rows.push([r.name, String(r.total), r.pct])
-  rows.push([])
-  rows.push(['分户名称', '能耗(kWh)', '占比(%)'])
-  for (const r of tenData.value) rows.push([r.name, String(r.total), r.pct])
-  const csv = rows.map(r => r.join(',')).join('\n')
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-  a.download = `energy_report_${monthVal.value}.csv`; a.click()
-}
-
-onMounted(load)
+function doPrint() { window.print() }
 </script>
-
 <style scoped>
-.report-general { display: flex; flex-direction: column; gap: 0; }
-.report-header { display: flex; justify-content: space-between; align-items: center; }
-.report-title { font-size: 16px; font-weight: 600; }
-.report-controls { display: flex; gap: 8px; align-items: center; }
-.metric-card { background: #f5f7fa; border-radius: 8px; padding: 16px 20px; border: 1px solid #e8eaef; }
-.metric-label { font-size: 13px; color: #8c8c8c; margin-bottom: 4px; }
-.metric-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
-.metric-unit { font-size: 13px; font-weight: 400; color: #8c8c8c; }
-.section-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap }
+.label { font-size:13px;color:#666;white-space:nowrap }
+.report-content { background:#fff;padding:20px;border-radius:8px }
+.report-title { font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;color:#1a1a2e }
+.report-date { font-size:12px;text-align:center;color:#8c8c8c;margin-bottom:16px }
+.report-summary { margin-top:12px;padding:12px 16px;background:#fafafa;border-radius:6px;font-size:13px;color:#595959 }
+@media print { .toolbar { display:none } .report-content { padding:0 } }
 </style>

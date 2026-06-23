@@ -88,6 +88,8 @@ async def energy_analysis(
         for eid in (1, 11, 12, 13, 14):
             if eid not in ids:
                 ids.append(eid)
+            if eid not in user_ids:
+                user_ids.append(eid)
 
     # 按读取原则确定数据查询粒度
     gran = resolve_granularity(start_date, end_date)

@@ -13,8 +13,9 @@ const routes = [
     { path: 'realtime-data', component: () => import('@/views/monitor/RealtimeData.vue'), meta: { title: '实时数据' } },
     { path: 'data-table', component: () => import('@/views/monitor/DataTable.vue'), meta: { title: '原始数据' } },
     { path: 'data-alert', component: () => import('@/views/monitor/AlertTable.vue'), meta: { title: '报警管理' } },
-    { path: 'report-general', component: () => import('@/views/report/General.vue'), meta: { title: '通用报表' } },
-    { path: 'report-branch', component: () => import('@/views/report/Branch.vue'), meta: { title: '支路报表' } },
+    { path: 'report-general', component: () => import('@/views/report/General.vue'), meta: { title: '分项能耗报表' } },
+    { path: 'report-branch', component: () => import('@/views/report/Branch.vue'), meta: { title: '分户能耗报表' } },
+    { path: 'report-equipment', component: () => import('@/views/report/EquipmentReport.vue'), meta: { title: '设备能耗报表' } },
     { path: 'report-custom', component: () => import('@/views/report/Custom.vue'), meta: { title: '定制报表' } },
   ]}
 ]
