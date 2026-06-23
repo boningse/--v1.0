@@ -155,9 +155,30 @@ function doPrint() { window.print() }
 <style scoped>
 .toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap }
 .label { font-size:13px;color:#666;white-space:nowrap }
-.report-content { background:#fff;padding:20px;border-radius:8px }
-.report-title { font-size:18px;font-weight:700;text-align:center;margin-bottom:4px;color:#1a1a2e }
-.report-date { font-size:12px;text-align:center;color:#8c8c8c;margin-bottom:16px }
-.report-summary { margin-top:12px;padding:12px 16px;background:#fafafa;border-radius:6px;font-size:13px;color:#595959 }
+.report-content { background:#fff;padding:28px;border-radius:8px }
+.report-title { font-size:22px;font-weight:700;text-align:center;margin-bottom:6px;color:#1a1a2e }
+.report-date { font-size:13px;text-align:center;color:#8c8c8c;margin-bottom:24px }
+.report-summary { margin-top:12px;padding:24px 20px;background:#fafafa;border-radius:6px;font-size:15px;color:#595959 }
 @media print { .toolbar { display:none } .report-content { padding:0 } }
+
+
+.energy-analysis, .tenement-analysis, .equipment-analysis, .report-page {
+  position: relative;
+}
+.energy-analysis::before, .tenement-analysis::before, .equipment-analysis::before, .report-page::before {
+  content: ''; position: absolute; top: 200px; left: -5%; width: 110%; height: 400px;
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(19,199,133,.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 50%, rgba(24,144,255,.04) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+.energy-analysis > *, .tenement-analysis > *, .equipment-analysis > *, .report-page::before + * { position: relative; z-index: 1; }
+.energy-analysis > *, .tenement-analysis > *, .equipment-analysis > * { position: relative; z-index: 1; }
+
+
+
+/* 卡片装饰条 */
+.el-card { position: relative; overflow: visible; }
+.el-card:not(.is-always-shadow) { overflow: hidden; }
+
 </style>

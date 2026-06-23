@@ -68,28 +68,19 @@
           <div class="summary-grid">
             <div class="summary-item">
               <span class="summary-label">能耗合计</span>
-              <span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span>
-              <span class="summary-unit">{{ conversionInfo?.unit }}</span>
+              <div class="summary-row"><span class="summary-value">{{ Number(summaryData.total_energy).toFixed(3) }}</span><span class="summary-unit">{{ conversionInfo?.unit }}</span></div>
             </div>
             <div class="summary-item">
               <span class="summary-label">单位面积能耗</span>
-              <span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span>
-              <span class="summary-unit">{{ conversionInfo?.unit }}/m²</span>
+              <div class="summary-row"><span class="summary-value">{{ Number(summaryData.per_area_energy).toFixed(3) }}</span><span class="summary-unit">{{ conversionInfo?.unit }}/m²</span></div>
             </div>
             <div class="summary-item">
               <span class="summary-label">参考价值</span>
-              <span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span>
-              <span class="summary-unit">元</span>
+              <div class="summary-row"><span class="summary-value">{{ Number(summaryData.reference_value).toFixed(2) }}</span><span class="summary-unit">元</span></div>
             </div>
             <div class="summary-item" :class="{ 'trend-up': summaryData.trend < 0, 'trend-down': summaryData.trend > 0 }">
-              <span class="summary-label">
-                能耗趋势
-                <span v-if="summaryData.trend < 0" class="trend-arrow">↓</span>
-                <span v-else-if="summaryData.trend > 0" class="trend-arrow">↑</span>
-                <span v-else class="trend-arrow">→</span>
-              </span>
-              <span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span>
-              <span class="summary-unit">较上期</span>
+              <span class="summary-label">能耗趋势</span>
+              <div class="summary-row"><span class="summary-value">{{ Math.abs(summaryData.trend) }}%</span><span class="summary-unit">较上期</span></div>
             </div>
           </div>
         </el-card>
@@ -258,27 +249,24 @@ watch(() => app.buildingSign, () => { loadTree() })
   gap: 16px;
 }
 .summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100px;
+  padding: 12px 20px;
   border-radius: 10px;
-  padding: 18px 20px;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,.08);
-  transition: transform .2s, box-shadow .2s;
-  cursor: default;
-}
-.summary-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
 }
 .summary-item:nth-child(1) { background: linear-gradient(135deg,#13c785,#0fa86b); }
 .summary-item:nth-child(2) { background: linear-gradient(135deg,#1890ff,#40a9ff); }
 .summary-item:nth-child(3) { background: linear-gradient(135deg,#fa8c16,#ffa940); }
 .summary-item:nth-child(4) { background: linear-gradient(135deg,#722ed1,#b37feb); }
-.summary-label { font-size: 12px; opacity: .8; margin-bottom: 2px; }
-.summary-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
-.summary-unit { font-size: 12px; font-weight: 400; opacity: .7; margin-left: 4px; }
+.summary-label { font-size: 15px; opacity: .85; line-height: 1.4; }
+.summary-row { display: flex; align-items: baseline; gap: 4px; }
+.summary-value { font-size: 22px; font-weight: 700; line-height: 1.3; }
+.summary-unit { font-size: 11px; font-weight: 400; opacity: .7; }
 .summary-item.trend-down { background: linear-gradient(135deg,#ff4d4f,#cf1322); }
 .summary-item.trend-up { background: linear-gradient(135deg,#52c41a,#389e0d); }
-.trend-arrow { font-size: 14px; margin-left: 2px; }
 
 @media (max-width: 992px) {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }

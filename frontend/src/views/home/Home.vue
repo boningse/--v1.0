@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.home { display: flex; flex-direction: column; gap: 16px; max-width: 1400px; margin: 0 auto; }
+.home { display: flex; flex-direction: column; gap: 24px; max-width: 1400px; margin: 0 auto; position: relative; }
 
 /* 建筑头部 */
 .building-hero {
@@ -243,20 +243,20 @@ onBeforeUnmount(() => {
 /* 指标卡片 */
 .stat-row { margin-bottom: 0 !important; }
 .stat-card {
-  display: flex; align-items: center; gap: 16px;
-  border-radius: 10px; padding: 18px 20px; color: #fff;
+  display: flex; align-items: center; gap: 24px;
+  border-radius: 10px; padding: 36px 28px; color: #fff;
   box-shadow: 0 4px 12px rgba(0,0,0,.08);
   transition: transform .2s, box-shadow .2s;
 }
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .stat-icon {
-  width: 46px; height: 46px; border-radius: 10px;
+  width: 64px; height: 64px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px; flex-shrink: 0;
+  font-size: 28px; flex-shrink: 0;
 }
 .stat-body { flex: 1; min-width: 0; }
-.stat-label { font-size: 12px; opacity: .8; margin-bottom: 4px; }
-.stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 14px; opacity: .85; margin-bottom: 6px; }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1.3; }
 .stat-unit { font-size: 12px; font-weight: 400; opacity: .7; }
 
 /* 图表卡片 */
@@ -281,10 +281,10 @@ onBeforeUnmount(() => {
 }
 .summary-card :deep(.el-card__header),
 .cats-card :deep(.el-card__header) { border-bottom: 1px solid #f0f0f0; padding: 14px 20px; }
-.card-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+.card-title { font-size: 16px; font-weight: 600; color: #1a1a2e; }
 .summary-items { display: flex; flex-direction: column; gap: 0; }
 .summary-item {
-  display: flex; align-items: center; padding: 10px 0;
+  display: flex; align-items: center; padding: 14px 0;
   border-bottom: 1px solid #f5f5f5;
 }
 .summary-item:last-child { border-bottom: none; }
@@ -309,4 +309,39 @@ onBeforeUnmount(() => {
   .stat-card { padding: 14px 16px; }
   .stat-value { font-size: 18px; }
 }
+
+/* 背景装饰 — 柔和的径向光晕 */
+.home::before {
+  content: ''; position: absolute; top: 260px; left: -5%; width: 110%; height: 400px;
+  background:
+    radial-gradient(ellipse at 30% 50%, rgba(19,199,133,.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 30%, rgba(24,144,255,.05) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+.home { position: relative; }
+.home > * { position: relative; z-index: 1; }
+
+/* 卡片顶部装饰条 */
+.chart-card { position: relative; overflow: hidden; }
+.chart-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 1;
+  background: linear-gradient(90deg, #13c785, #1890ff, #fa8c16);
+}
+.summary-card { position: relative; overflow: hidden; }
+.summary-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 1;
+  background: linear-gradient(90deg, #722ed1, #1890ff);
+}
+.cats-card { position: relative; overflow: hidden; }
+.cats-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 1;
+  background: linear-gradient(90deg, #fa8c16, #13c785);
+}
+
+/* 统计图标内部质感 */
+.stat-icon { position: relative; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+
+/* 占比条细节 */
+.cat-bar-wrap { box-shadow: inset 0 1px 2px rgba(0,0,0,.06); }
+
 </style>
