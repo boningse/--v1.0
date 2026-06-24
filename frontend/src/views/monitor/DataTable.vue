@@ -19,32 +19,32 @@
       <template #header>
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:14px;font-weight:600">支路原始数据</span>
-          <span v-if="reportTotal" style="font-size:13px;color:#666">总能耗: <strong style="color:#1890ff">{{ Number(reportTotal).toFixed(3) }}</strong> {{ conversionInfo?.unit || 'kWh' }}</span>
+          <span v-if="reportTotal" style="font-size:13px;color:var(--text-secondary)">总能耗: <strong style="color:#1890ff">{{ Number(reportTotal).toFixed(3) }}</strong> {{ conversionInfo?.unit || 'kWh' }}</span>
         </div>
       </template>
       <el-table :data="tableData" border stripe size="small" v-loading="loading" style="width:100%" :tree-props="{ children: 'children', hasChildren: 'has_children' }" row-key="id" default-expand-all>
         <el-table-column label="支路名称" min-width="180">
           <template #default="{ row }">
-            <span :style="{ paddingLeft: row.level * 24 + 'px', fontWeight: row.level === 0 ? 600 : 400, color: row.level === 0 ? '#1a1a2e' : '#595959' }">
+            <span :style="{ paddingLeft: row.level * 24 + 'px', fontWeight: row.level === 0 ? 600 : 400, color: 'var(--text-primary)' }">
               {{ row.name }}
             </span>
           </template>
         </el-table-column>
         <el-table-column label="查询时间" width="240" align="center">
           <template #default="{ row }">
-            <span style="font-size:12px;color:#8c8c8c">{{ row.start_time }} ~ {{ row.end_time }}</span>
+            <span style="font-size:12px;color:var(--text-secondary)">{{ row.start_time }} ~ {{ row.end_time }}</span>
           </template>
         </el-table-column>
         <el-table-column label="起始数据" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row.first_val !== null" style="color:#1890ff;font-weight:600;font-size:13px">{{ Number(row.first_val).toFixed(3) }}</span>
-            <span v-else style="color:#bfbfbf;font-size:12px">--</span>
+            <span v-else style="color:var(--text-secondary);font-size:12px">--</span>
           </template>
         </el-table-column>
         <el-table-column label="截止数据" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row.last_val !== null" style="color:#1890ff;font-weight:600;font-size:13px">{{ Number(row.last_val).toFixed(3) }}</span>
-            <span v-else style="color:#bfbfbf;font-size:12px">--</span>
+            <span v-else style="color:var(--text-secondary);font-size:12px">--</span>
           </template>
         </el-table-column>
         <el-table-column label="总能耗" width="110" align="right">

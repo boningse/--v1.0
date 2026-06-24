@@ -16,32 +16,32 @@
       <div class="report-date">{{ dateRange?.[0] }} ~ {{ dateRange?.[1] }}</div>
       <el-table :data="tableData" border stripe size="small" v-loading="loading" style="width:100%">
         <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column label="设备名称" min-width="240">
+        <el-table-column label="设备名称" min-width="160">
           <template #default="{ row }">
             <span :style="{ paddingLeft: row.level * 20 + 'px', fontWeight: row.level === 0 ? 600 : 400, color: row.level === 0 ? '#1a1a2e' : '#595959' }">
               {{ row.name }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="本期能耗" width="120" align="right">
+        <el-table-column label="本期能耗" width="140" align="right">
           <template #default="{row}">{{ Number(row.total).toFixed(3) }}</template>
         </el-table-column>
-        <el-table-column label="上期能耗" width="120" align="right">
+        <el-table-column label="上期能耗" width="140" align="right">
           <template #default="{row}">
             <span v-if="row.prev_total !== null">{{ Number(row.prev_total).toFixed(3) }}</span>
-            <span v-else style="color:#bfbfbf">--</span>
+            <span v-else style="color:var(--text-secondary)">--</span>
           </template>
         </el-table-column>
-        <el-table-column label="能耗对比" width="110" align="center">
+        <el-table-column label="能耗对比" width="130" align="center">
           <template #default="{row}">
             <span v-if="row.change !== null" :style="{ color: row.change > 0 ? '#ff4d4f' : row.change < 0 ? '#52c41a' : '#8c8c8c', fontWeight: 500 }">
               <span v-if="row.change > 0">↑</span><span v-else-if="row.change < 0">↓</span>
               {{ row.change }}%
             </span>
-            <span v-else style="color:#bfbfbf">--</span>
+            <span v-else style="color:var(--text-secondary)">--</span>
           </template>
         </el-table-column>
-        <el-table-column label="占比(%)" width="80" align="right">
+        <el-table-column label="占比(%)" width="100" align="right">
           <template #default="{row}">{{ row.pct }}%</template>
         </el-table-column>
       </el-table>
@@ -152,11 +152,11 @@ function doPrint() { window.print() }
 </script>
 <style scoped>
 .toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap }
-.label { font-size:13px;color:#666;white-space:nowrap }
-.report-content { background:#fff;padding:28px;border-radius:8px }
-.report-title { font-size:22px;font-weight:700;text-align:center;margin-bottom:6px;color:#1a1a2e }
-.report-date { font-size:13px;text-align:center;color:#8c8c8c;margin-bottom:24px }
-.report-summary { margin-top:12px;padding:24px 20px;background:#fafafa;border-radius:6px;font-size:15px;color:#595959 }
+.label { font-size:13px;color:var(--text-secondary);white-space:nowrap }
+.report-content { background:var(--card-bg);padding:36px;border-radius:8px }
+.report-title { font-size:22px;font-weight:700;text-align:center;margin-bottom:6px;color:var(--text-primary) }
+.report-date { font-size:13px;text-align:center;color:var(--text-secondary);margin-bottom:24px }
+.report-summary { margin-top:12px;padding:24px 20px;background:var(--main-bg);border-radius:6px;font-size:15px;color:var(--text-secondary) }
 @media print { .toolbar { display:none } .report-content { padding:0 } }
 
 

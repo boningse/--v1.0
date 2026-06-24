@@ -47,7 +47,7 @@
               </div>
             </div>
           </template>
-          <div ref="chartRef" key="main-chart" style="min-height:418px;flex:1"></div>
+          <div ref="chartRef" key="main-chart" style="min-height:360px;flex:1"></div>
         </el-card>
       </el-col>
 
@@ -220,7 +220,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.home { display: flex; flex-direction: column; gap: 24px; max-width: 1400px; margin: 0 auto; position: relative; }
+.home { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 100%; padding: 0 16px; margin: 0 auto; position: relative; box-sizing: border-box; }
 
 /* 建筑头部 */
 .building-hero {
@@ -247,21 +247,21 @@ onBeforeUnmount(() => {
 /* 指标卡片 */
 .stat-row { margin-bottom: 0 !important; }
 .stat-card {
-  display: flex; align-items: center; gap: 24px;
-  border-radius: 10px; padding: 36px 28px; color: #fff;
+  display: flex; align-items: center; gap: 16px;
+  border-radius: 10px; padding: 24px 20px; color: #fff;
   box-shadow: 0 4px 12px rgba(0,0,0,.08);
   transition: transform .2s, box-shadow .2s;
 }
 .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .stat-icon {
-  width: 64px; height: 64px; border-radius: 14px;
+  width: 48px; height: 48px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px; flex-shrink: 0;
+  font-size: 22px; flex-shrink: 0;
 }
 .stat-body { flex: 1; min-width: 0; }
-.stat-label { font-size: 14px; opacity: .85; margin-bottom: 6px; }
-.stat-value { font-size: 28px; font-weight: 700; line-height: 1.3; }
-.stat-unit { font-size: 12px; font-weight: 400; opacity: .7; }
+.stat-label { font-size: 13px; opacity: .85; margin-bottom: 4px; }
+.stat-value { font-size: 24px; font-weight: 700; line-height: 1.3; }
+.stat-unit { font-size: 11px; font-weight: 400; opacity: .7; }
 
 /* 图表卡片 */
 .chart-card {
@@ -305,13 +305,37 @@ onBeforeUnmount(() => {
 .cat-bar { height: 100%; border-radius: 5px; transition: width .6s ease; }
 .cat-val { font-size: 12px; color: #8c8c8c; width: 60px; text-align: right; }
 
+/* 大屏优化 - 充分利用空间 */
+@media (min-width: 1600px) {
+  .home { padding: 0 40px; }
+  .stat-card { padding: 28px 24px; }
+  .stat-icon { width: 56px; height: 56px; font-size: 26px; }
+  .stat-value { font-size: 28px; }
+}
+/* 中屏适配 */
+@media (max-width: 1200px) {
+  .stat-card { padding: 18px 16px; gap: 12px; }
+  .stat-icon { width: 40px; height: 40px; font-size: 18px; border-radius: 10px; }
+  .stat-value { font-size: 20px; }
+}
+/* 平板/手机适配 */
 @media (max-width: 768px) {
-  .building-hero { padding: 20px; }
+  .home { gap: 12px; padding: 0 8px; }
+  .building-hero { padding: 16px; }
   .hero-content { flex-direction: column; align-items: flex-start; gap: 8px; }
   .hero-right { text-align: left; width: 100%; }
   .hero-status { justify-content: flex-start; }
-  .stat-card { padding: 14px 16px; }
-  .stat-value { font-size: 18px; }
+  .stat-card { padding: 14px 12px; gap: 10px; min-height: 70px; }
+  .stat-icon { width: 36px; height: 36px; font-size: 16px; border-radius: 8px; }
+  .stat-value { font-size: 16px; }
+  .chart-card :deep(.el-card__body) { min-height: 250px; }
+}
+/* 小手机适配 */
+@media (max-width: 480px) {
+  .stat-card { flex-direction: row; align-items: center; }
+  .stat-icon { display: none; }
+  .stat-value { font-size: 14px; }
+  .chart-header { flex-direction: column; align-items: flex-start; }
 }
 
 /* 背景装饰 — 柔和的径向光晕 */
