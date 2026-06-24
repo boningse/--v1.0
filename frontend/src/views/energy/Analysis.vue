@@ -78,7 +78,7 @@
     <!-- ====== 主体: 左侧分项树 + 右侧图表 ====== -->
     <el-row :gutter="16" style="margin-top:12px;display:flex;flex-wrap:wrap;align-items:stretch">
       <!-- 左侧: 分项树 -->
-      <el-col :span="5">
+      <el-col :xs="24" :md="5">
         <el-card shadow="hover" class="tree-card">
           <template #header>
             <div class="tree-header">
@@ -88,7 +88,7 @@
           <el-tree
             ref="treeRef"
             :data="treeData"
-            :props="{ children: 'children', label: 'name', disabled: 'disabled' }"
+            :props="{ children: 'children', label: 'name' }"
             node-key="id"
             default-expand-all
             highlight-current
@@ -98,7 +98,7 @@
       </el-col>
 
       <!-- 右侧: 图表 -->
-      <el-col :span="19">
+      <el-col :xs="24" :md="19">
         <el-card shadow="hover">
           <template #header>
             <div class="chart-header">
@@ -186,7 +186,6 @@ function onTimeTypeChange() {
 }
 
 function onNodeClick(data: any) {
-  if (data.disabled) return
   selectedItemId.value = data.id
   treeRef.value?.setCurrentKey(data.id)
   doSearch()
@@ -383,6 +382,9 @@ watch(() => app.buildingSign, () => {
   height: calc(100vh - 220px);
   overflow-y: auto;
 }
+@media(max-width:767px){
+  .tree-card{height:auto;max-height:200px;margin-bottom:8px}
+}
 .tree-card .el-card__header {
   border-bottom: 1px solid #f0f0f0;
   padding: 12px 16px;
@@ -400,13 +402,9 @@ watch(() => app.buildingSign, () => {
 /* 无数据分项灰色不可选 */
 .el-tree-node.is-disabled > .el-tree-node__content {
   color: #bbb;
-  cursor: not-allowed;
 }
 .el-tree-node.is-disabled > .el-tree-node__content .el-tree-node__label {
   color: #bbb;
-}
-.el-tree-node.is-disabled .el-checkbox {
-  display: none;
 }
 .chart-header {
   display: flex;

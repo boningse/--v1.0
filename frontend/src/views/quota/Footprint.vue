@@ -12,7 +12,7 @@
       </div>
     </el-card>
     <el-row :gutter="12" style="margin-top:12px">
-      <el-col :span="6" v-for="item in summaryCards" :key="item.label">
+      <el-col :xs="12" :md="6" v-for="item in summaryCards" :key="item.label">
         <div class="summary-item" :style="{ background: item.bg }">
           <span class="summary-label">{{ item.label }}</span>
           <div class="summary-row"><span class="summary-value">{{ item.value }}</span><span class="summary-unit">{{ item.unit }}</span></div>
@@ -20,13 +20,13 @@
       </el-col>
     </el-row>
     <el-row :gutter="12" style="margin-top:12px">
-      <el-col :span="10">
+      <el-col :xs="24" :md="10">
         <el-card shadow="hover">
           <template #header><span class="card-title">用电足迹雷达</span></template>
           <div ref="chartRadarRef" style="width:100%;height:380px"></div>
         </el-card>
       </el-col>
-      <el-col :span="14">
+      <el-col :xs="24" :md="14">
         <el-card shadow="hover">
           <template #header><span class="card-title">年度用电趋势</span></template>
           <div ref="chartTrendRef" style="width:100%;height:380px"></div>
@@ -36,7 +36,7 @@
     <el-card shadow="hover" style="margin-top:12px">
       <template #header><span class="card-title">分项用电足迹</span></template>
       <el-row :gutter="16">
-        <el-col :span="8" v-for="item in footprintItems" :key="item.name" style="margin-bottom:12px">
+        <el-col :xs="24" :md="12" :lg="8" v-for="item in footprintItems" :key="item.name" style="margin-bottom:12px">
           <div class="footprint-card">
             <div class="fp-header">
               <span class="fp-icon" :style="{ background: item.bg }">{{ item.icon }}</span>
@@ -211,4 +211,10 @@ onUnmounted(() => { try { chartRadar?.dispose(); chartTrend?.dispose() } catch(e
 .fp-bar-wrap { margin-bottom: 8px; } .fp-bar-label { font-size: 11px; color: #999; margin-bottom: 4px; }
 .fp-status { display: flex; align-items: center; justify-content: space-between; }
 .fp-diff { font-size: 12px; color: #999; }
+
+@media(max-width:767px){
+  .summary-item { height: 70px; padding: 10px 16px; }
+  .summary-value { font-size: 18px; }
+  .fp-value { font-size: 22px; }
+}
 </style>

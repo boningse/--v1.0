@@ -14,7 +14,7 @@
 
     <!-- 维度一：能耗概况 -->
     <el-row :gutter="12" style="margin-top:12px">
-      <el-col :span="6">
+      <el-col :xs="24" :md="6">
         <div class="grade-card">
           <div class="grade-score">{{ gradeData.grade }}</div>
           <div class="grade-label">{{ gradeData.label }}</div>
@@ -27,7 +27,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :md="6">
         <el-card shadow="hover" style="height:100%">
           <template #header><span class="card-title">能耗概览</span></template>
           <div class="overview-stats">
@@ -38,7 +38,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :xs="24" :md="12">
         <el-card shadow="hover" style="height:100%">
           <template #header><span class="card-title">月度能耗趋势 vs 定额标准</span></template>
           <div ref="chartTrendRef" style="width:100%;height:240px"></div>
@@ -48,7 +48,7 @@
 
     <!-- 维度二：分项定额对标 -->
     <el-row :gutter="12" style="margin-top:12px">
-      <el-col :span="16">
+      <el-col :xs="24" :md="16">
         <el-card shadow="hover" style="height:100%">
           <template #header><span class="card-title">分项定额对标分析</span></template>
           <el-table :data="quotaCompareRows" stripe size="small" style="width:100%">
@@ -70,7 +70,7 @@
           </el-table>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :md="8">
         <el-card shadow="hover" style="height:100%">
           <template #header><span class="card-title">分项占比</span></template>
           <div ref="chartPieRef" style="width:100%;height:260px"></div>

@@ -21,7 +21,7 @@
         </div>
       </template>
       <el-row :gutter="16">
-        <el-col :span="6" v-for="item in compareCards" :key="item.label">
+        <el-col :xs="12" :md="6" v-for="item in compareCards" :key="item.label">
           <div class="compare-item" :class="item.cls">
             <div class="ci-label">{{ item.label }}</div>
             <div class="ci-value">{{ item.value }} <small>{{ item.unit }}</small></div>
@@ -31,13 +31,13 @@
       </el-row>
     </el-card>
     <el-row :gutter="12" style="margin-top:12px">
-      <el-col :span="14">
+      <el-col :xs="24" :md="14">
         <el-card shadow="hover">
           <template #header><span class="card-title">月度用电 vs 定额标准</span></template>
           <div ref="chartBarRef" style="width:100%;height:380px"></div>
         </el-card>
       </el-col>
-      <el-col :span="10">
+      <el-col :xs="24" :md="10">
         <el-card shadow="hover">
           <template #header><span class="card-title">评价星级</span></template>
           <div class="eval-wrap">
@@ -209,6 +209,7 @@ onUnmounted(() => { try { chartBar?.dispose() } catch(e) {} })
 .filter-group { display: flex; align-items: center; gap: 6px; }
 .card-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
 .compare-item { border-radius: 10px; padding: 16px 20px; color: #fff; }
+.compare-item { border-radius: 10px; padding: 16px 20px; color: #fff; min-height: 90px; display:flex;flex-direction:column;justify-content:center; }
 .ci-actual { background: linear-gradient(135deg,#13c785,#0fa86b); }
 .ci-safe { background: linear-gradient(135deg,#1890ff,#40a9ff); }
 .ci-warn { background: linear-gradient(135deg,#fa8c16,#ffa940); }
@@ -224,4 +225,17 @@ onUnmounted(() => { try { chartBar?.dispose() } catch(e) {} })
 .eval-bar-fill { height: 100%; background: linear-gradient(90deg,#52c41a,#fa8c16,#ff4d4f); border-radius: 10px; transition: width .5s ease; }
 .eval-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: #999; margin-top: 4px; }
 .eval-desc { font-size: 12px; color: #999; }
+
+/* 手机适配 */
+@media(max-width:767px){
+  .compare-item { min-height: 70px; padding: 12px 14px; }
+  .ci-value { font-size: 20px; }
+  .ci-label { font-size: 12px; }
+  .eval-score { font-size: 42px; }
+  .eval-label { font-size: 15px; }
+}
+@media(min-width:768px) and (max-width:1200px){
+  .ci-value { font-size: 22px; }
+}
+
 </style>

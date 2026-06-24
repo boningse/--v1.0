@@ -50,14 +50,14 @@
     </el-card>
 
     <el-row :gutter="16" style="margin-top:12px">
-      <el-col :span="5">
+      <el-col :xs="24" :md="5">
         <el-card shadow="hover" class="tree-card">
           <template #header><div class="tree-header"><span>分户列表</span><div class="tree-actions"><el-button link size="small" @click="checkAll">全选</el-button><el-button link size="small" @click="uncheckAll">取消</el-button></div></div>
 
     </template>
             <el-tree ref="treeRef" :data="treeData" :props="{ children:'children', label:'name' }" node-key="id" show-checkbox check-strictly default-expand-all highlight-current @check="onTreeCheck" />
           </el-card>      </el-col>
-      <el-col :span="19">
+      <el-col :xs="24" :md="19">
         <el-card shadow="hover">
           <template #header><div style="font-size:14px;font-weight:600">能耗数据 <span v-if="conversionInfo" style="font-size:12px;font-weight:normal;color:#999;margin-left:8px">单位: {{ conversionInfo.unit }}</span></div></template>
           <div ref="chartRef" style="width:100%;height:420px"></div>
@@ -245,6 +245,7 @@ watch(energyType, () => { loadTree() })
 }
 .tree-card {
   height: calc(100vh - 220px);
+@media(max-width:767px){.tree-card{height:auto;max-height:200px;margin-bottom:8px}}
   overflow-y: auto;
 }
 .tree-card .el-card__header {

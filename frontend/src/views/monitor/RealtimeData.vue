@@ -1,7 +1,7 @@
 <template>
   <div class="realtime-data">
     <el-row :gutter="16">
-      <el-col :span="5">
+      <el-col :xs="24" :md="5">
         <el-card shadow="hover" class="tree-card">
           <template #header>
             <div class="tree-header">
@@ -24,7 +24,7 @@
           />
         </el-card>
       </el-col>
-      <el-col :span="19">
+      <el-col :xs="24" :md="19">
         <el-card shadow="hover">
           <template #header>
             <div style="display:flex;align-items:center;justify-content:space-between">

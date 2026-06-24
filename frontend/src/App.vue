@@ -78,4 +78,13 @@ html,body,#app{height:100%;font-family:'PingFang SC',Helvetica,Arial,sans-serif}
 .dark .el-table .cell span[style*="1890ff"],
 .dark .el-table .cell strong[style*="1890ff"] { color: #4da6ff !important; }
 .dark .el-table .cell span[style*="666"] { color: var(--text-secondary) !important; }
+
+/* 移动端表格水平滚动 */
+@media (max-width: 767px) {
+  .el-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .el-table__body-wrapper { overflow-x: auto !important; }
+  .el-card { border-radius: 6px; }
+  .el-card__body { padding: 12px; }
+  .el-main { padding: 8px; }
+}
 </style>
