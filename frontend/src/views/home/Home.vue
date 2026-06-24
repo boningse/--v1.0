@@ -47,7 +47,7 @@
               </div>
             </div>
           </template>
-          <div ref="chartRef" style="min-height:418px;flex:1"></div>
+          <div ref="chartRef" key="main-chart" style="min-height:418px;flex:1"></div>
         </el-card>
       </el-col>
 
@@ -134,22 +134,26 @@ const catItems = computed(() => {
 async function load(et: number = curType.value) {
   const sign = app.buildingSign
   if (!sign) return
+  try {
   const res: any = await request.get('/dashboard/homepage', { params: { sign, energy_type: et } })
   if (res.success) {
     data.value = res.data
     await nextTick()
     renderChart()
   }
+  } catch(e) { console.warn('Home data load error:', e) }
 }
 
 function renderChart() {
   if (!chartRef.value || !data.value?.chart?.data?.length) return
+  try {
   if (chartInstance) {
     const h = (chartInstance as any).__resizeHandler
-    if (h) window.removeEventListener('resize', h)
-    chartInstance.dispose()
+    if (h) try { window.removeEventListener('resize', h) } catch(e) {}
+    try { chartInstance.dispose() } catch(e) {}
   }
   chartInstance = echarts.init(chartRef.value)
+  } catch(e) { console.warn('Chart render error:', e); return }
   const cd = data.value.chart
 
   chartInstance.setOption(
