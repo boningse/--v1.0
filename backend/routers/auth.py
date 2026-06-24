@@ -14,10 +14,16 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     if not payload: raise HTTPException(401)
     return payload
 
+from pydantic import BaseModel
+
+class LoginRequest(BaseModel):
+    useraccount: str = ""
+    userpassword: str = ""
+
 @router.post("/login")
-async def login(data: dict):
-    acc = data.get("useraccount", "")
-    pwd = data.get("userpassword", "")
+async def login(data: LoginRequest):
+    acc = data.useraccount
+    pwd = data.userpassword
 
     # 先验证密码规则
     if not password_ok(acc, pwd):
@@ -36,9 +42,10 @@ async def login(data: dict):
 
         if not building:
             # 最后尝试: 用 building 表里的 name 模糊匹配 useraccount
-            # zhyk=中国航油-油库, sign=3701122502
-            if acc == "zhyk":
-                building = db.query_one("constr_ems", "SELECT sign, name FROM building WHERE sign=%s", ("3701122502",))
+            # 通过 useraccount 直接查询 sign （支持多建筑映射）
+            building = db.query_one("constr_ems",
+                "SELECT b.sign, b.name FROM building b JOIN user u ON u.sign = b.sign WHERE u.useraccount=%s",
+                (acc,))
 
         if not building:
             return {"success": False, "message": "账号不存在"}

@@ -87,7 +87,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useAppStore } from '@/stores/index'
 import { fmtNum } from '@/utils/index'
-import request from '@/api/request'
+import { getDashboardHomepage } from '@/api/index'
 
 const app = useAppStore()
 const chartRef = ref()
@@ -128,14 +128,14 @@ const catItems = computed(() => {
   return names.map((name, i) => {
     const val = raw[name] ? Number(raw[name]) : 0
     return { name, val: val.toFixed(1), pct: total > 0 ? Math.max(val / total * 100, 1) : 0, color: catColors[i] }
-  }).filter(c => c.pct > 0 || true)
+  })
 })
 
 async function load(et: number = curType.value) {
   const sign = app.buildingSign
   if (!sign) return
   try {
-  const res: any = await request.get('/dashboard/homepage', { params: { sign, energy_type: et } })
+  const res: any = await getDashboardHomepage({ sign, energy_type: et })
   if (res.success) {
     data.value = res.data
     await nextTick()

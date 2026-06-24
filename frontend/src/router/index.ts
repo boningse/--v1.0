@@ -16,9 +16,9 @@ const routes = [
     { path: 'quota-analysis', component: () => import('@/views/quota/Analysis.vue'), meta: { title: '定额分析' } },
     { path: 'quota-footprint', component: () => import('@/views/quota/Footprint.vue'), meta: { title: '能耗足迹' } },
     { path: 'quota-diagnosis', component: () => import('@/views/quota/Diagnosis.vue'), meta: { title: '节能诊断' } },
-    { path: 'report-general', component: () => import('@/views/report/General.vue'), meta: { title: '分项能耗报表' } },
-    { path: 'report-branch', component: () => import('@/views/report/Branch.vue'), meta: { title: '分户能耗报表' } },
-    { path: 'report-equipment', component: () => import('@/views/report/EquipmentReport.vue'), meta: { title: '设备能耗报表' } },
+    { path: 'report-general', component: () => import('@/views/report/General.vue'), meta: { title: '分项报表' } },
+    { path: 'report-branch', component: () => import('@/views/report/Branch.vue'), meta: { title: '分户报表' } },
+    { path: 'report-equipment', component: () => import('@/views/report/EquipmentReport.vue'), meta: { title: '设备报表' } },
   ]}
 ]
 const router = createRouter({ history: createWebHashHistory(), routes })

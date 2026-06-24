@@ -327,7 +327,7 @@ async def homepage(
     except:
         pass
 
-        # 获取分项占比数据（仅限电类型有分项概念）
+    # 获取分项占比数据（仅限电类型有分项概念）
     cat_data = {}
     if energy_type == 1:
         try:

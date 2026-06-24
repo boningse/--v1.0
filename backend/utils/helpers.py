@@ -1,7 +1,5 @@
 from datetime import date, datetime
 from typing import List, Optional
-from typing import List, Optional
-from typing import List, Optional
  
 def resolve_granularity(start_date: str, end_date: str) -> int:
     """根据查询日期范围确定数据读取粒度。
