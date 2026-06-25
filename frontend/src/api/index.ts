@@ -1,6 +1,7 @@
 import r from './request'
 export const login = (d: any) => r.post('/auth/login', d)
 export const getMyBuilding = () => r.get('/auth/my_building')
+export const getBuildings = () => r.get("/auth/buildings")
 export const getTitle = () => r.get('/auth/title')
 export const getDashboardHomepage = (p: any) => r.get('/dashboard/homepage', { params: p })
 export const getEnergyItems = (sign: string) => r.get('/energy/items', { params: { sign } })

@@ -43,7 +43,10 @@
         <el-header class="header">
           <div class="header-left">
             <el-button text size="small" class="menu-btn" @click="toggleMenu">{{ isMobile && !mobileOpen ? '☰' : !isCollapsed ? '✕' : '☰' }}</el-button>
-            <span class="header-title">{{ app.buildingName || (isMobile ? '' : '能耗监测子系统') }} · {{ route.meta.title }}</span>
+            <el-select v-if="buildingList.length > 0" v-model="currSign" size="small" style="width:140px" @change="switchBuilding" :teleported="false">
+              <el-option v-for="b in buildingList" :key="b.sign" :label="b.name" :value="b.sign" />
+            </el-select>
+            <span class="header-title">{{ buildingName || route.meta.title }}</span>
           </div>
           <div class="hr">
             <span class="user-name">{{ auth.user?.username }}</span>
@@ -57,12 +60,29 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import { useAuthStore, useAppStore } from '@/stores/index'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import { useAuthStore, useAppStore } from '@/stores/index'; import { getBuildings } from '@/api/index'
 const route = useRoute(); const router = useRouter(); const auth = useAuthStore(); const app = useAppStore()
 const isCollapsed = ref(false); const mobileOpen = ref(false)
 const isMobile = ref(false)
+const buildingList = ref<any[]>([]); const currSign = ref(''); const buildingName = ref('')
+async function loadBuildings() {
+  try {
+    const r: any = await getBuildings()
+    if (r.success && r.data) {
+      buildingList.value = r.data
+      currSign.value = app.buildingSign || r.data[0]?.sign || ''
+      const cur = r.data.find((b: any) => b.sign === currSign.value)
+      buildingName.value = cur?.name || app.buildingName || ''
+    }
+  } catch(e) { console.warn('load buildings error', e) }
+}
+function switchBuilding(sign: string) {
+  const b = buildingList.value.find((x: any) => x.sign === sign)
+  if (b) { app.setBuilding(b.sign, b.name); buildingName.value = b.name; location.reload() }
+}
+watch(() => app.buildingSign, (v) => { currSign.value = v || '' })
+onMounted(() => { updateMobile(); window.addEventListener('resize', updateMobile); loadBuildings() })
 function updateMobile() { isMobile.value = window.innerWidth < 768; if (!isMobile.value) mobileOpen.value = false }
-onMounted(() => { updateMobile(); window.addEventListener('resize', updateMobile) })
 onUnmounted(() => window.removeEventListener('resize', updateMobile))
 // Auto-close mobile sidebar on route change
 watch(() => route.path, () => { if (isMobile.value) mobileOpen.value = false })

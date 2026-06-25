@@ -97,7 +97,10 @@ const QUOTA: Record<string, { constraint: number; baseline: number; guidance: nu
 }
 const DEF = { constraint: 40, baseline: 30, guidance: 20 }
 const MONTHLY_WEIGHTS = [0.105, 0.095, 0.08, 0.065, 0.06, 0.08, 0.095, 0.095, 0.075, 0.065, 0.08, 0.105]
-const stdVal = computed(() => QUOTA[buildingInfo.type] || DEF)
+const stdVal = computed(() => {
+  const t = buildingInfo.type
+  return QUOTA[t] || (t === 'A' ? QUOTA['\u884c\u653f\u673a\u5173'] : DEF)
+})
 const evalData = computed(() => {
   const pa = energyData.perArea; const s = stdVal.value
   return { grade: pa <= s.guidance ? 'A' : pa <= s.baseline ? 'B' : pa <= s.constraint ? 'C' : 'D', label: pa <= s.guidance ? '优秀' : pa <= s.baseline ? '良好' : pa <= s.constraint ? '一般' : '超标' }

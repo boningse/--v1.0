@@ -74,6 +74,21 @@ async def login(data: LoginRequest):
         }
     }
 
+
+@router.get("/buildings")
+async def get_buildings(user: dict = Depends(current_user)):
+    """返回用户可访问的建筑列表。admin/super 返回全部，其它返回自己的"""
+    account = user.get("useraccount", "")
+    is_admin = account in ("admin", "super", "管理员", "超级管理员")
+    if is_admin:
+        buildings = db.query("constr_ems", "SELECT sign, name FROM building ORDER BY name")
+    else:
+        signs = [s.strip() for s in user.get("signroles", "").split(",") if s.strip()]
+        if not signs:
+            return {"success": False, "message": "无建筑权限"}
+        buildings = db.query("constr_ems", "SELECT sign, name FROM building WHERE sign=%s", (signs[0],))
+    return {"success": True, "data": buildings, "is_admin": is_admin}
+
 @router.get("/my_building")
 async def my_building(user: dict = Depends(current_user)):
     """获取当前用户的子系统建筑"""
