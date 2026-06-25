@@ -24,3 +24,5 @@ Thumbs.db
 # Config
 .env
 *.bak
+deploy.tar.gz
+backend/web.config
